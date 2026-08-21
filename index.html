@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Pendências de Faturamento</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f8f9fa; --sidebar:#575757; --sidebar-2:#4a4a4a;
+  --blue:#0d6efd; --green:#198754; --amber:#ffc107; --red:#dc3545;
+  --muted:#6c757d; --card:#ffffff; --line:#e9ecef;
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--bg); font-family:"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color:#212529;}
+.sidebar{position:fixed; top:0; left:0; height:100vh; width:260px;
+  background:linear-gradient(180deg,var(--sidebar),var(--sidebar-2)); color:#e3e4e6; padding:0; z-index:1040;
+  display:flex; flex-direction:column; transition:transform .3s ease; box-shadow:2px 0 12px rgba(0,0,0,.08);}
+.sidebar .brand{padding:22px 20px; display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center; border-bottom:1px solid rgba(255,255,255,.10);}
+.sidebar .brand .brand-logo{width:170px;max-width:80%;height:auto;display:block}
+.sidebar .brand .brand-txt{width:100%}
+.sidebar .brand .brand-txt h6{color:#fff;margin:0;font-weight:700;font-size:16px;line-height:1.15}
+.sidebar .brand .brand-txt small{color:#d7d9db;font-size:11.5px}
+.sidebar .brand .logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--blue),var(--green));
+  display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;}
+.sidebar .brand h6{color:#fff;margin:0;font-weight:700;font-size:15px;line-height:1.1}
+.sidebar .brand small{color:#6c757d;font-size:11px}
+.sidebar .nav-section{padding:16px 20px 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#c2c4c6}
+.sidebar .nav-link{color:#e3e4e6; padding:11px 20px; display:flex; align-items:center; gap:12px;
+  font-size:14px; border-left:3px solid transparent; transition:all .2s;}
+.sidebar .nav-link i{width:20px;text-align:center;font-size:15px}
+.sidebar .nav-link:hover{background:rgba(255,255,255,.10); color:#fff; border-left-color:#fff}
+.sidebar .nav-link.active{background:rgba(255,255,255,.16); color:#fff; border-left-color:#fff}
+.sidebar .foot{margin-top:auto;padding:16px 20px;font-size:11px;color:#c2c4c6;border-top:1px solid rgba(255,255,255,.10)}
+.sidebar .foot .dev-credit{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);font-size:11px;line-height:1.5;color:#8b929a}
+.sidebar .foot .dev-credit i{color:var(--blue);margin-right:4px}
+.sidebar .foot .dev-credit b{color:#e9ecef;font-weight:600}
+.sidebar .foot .dev-credit span{color:var(--green);font-weight:600;letter-spacing:.03em}
+.main{margin-left:260px; transition:margin .3s ease; min-height:100vh}
+.topbar{background:#fff; padding:16px 28px; border-bottom:1px solid var(--line);
+  display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:1020; box-shadow:0 1px 3px rgba(0,0,0,.03);}
+.topbar h4{margin:0;font-weight:700;font-size:20px}
+.topbar small{color:var(--muted)}
+.content{padding:26px 28px}
+.hamburger{display:none;background:none;border:none;font-size:20px;color:#212529}
+.kpi{background:var(--card); border-radius:14px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.05);
+  border-left:4px solid var(--blue); height:100%; transition:transform .2s, box-shadow .2s; cursor:pointer; position:relative;}
+.kpi:hover{transform:translateY(-3px); box-shadow:0 8px 20px rgba(0,0,0,.09)}
+.kpi.active-kpi{box-shadow:0 0 0 2px currentColor, 0 8px 20px rgba(0,0,0,.12)}
+.kpi.blue{border-left-color:var(--blue)} .kpi.green{border-left-color:var(--green)}
+.kpi.amber{border-left-color:var(--amber)} .kpi.red{border-left-color:var(--red)}
+.kpi .icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:14px;}
+.kpi.blue .icon{background:rgba(13,110,253,.12);color:var(--blue)}
+.kpi.green .icon{background:rgba(25,135,84,.12);color:var(--green)}
+.kpi.amber .icon{background:rgba(255,193,7,.15);color:#b98900}
+.kpi.red .icon{background:rgba(220,53,69,.12);color:var(--red)}
+.kpi .label{color:var(--muted);font-size:13px;font-weight:500;margin:0}
+.kpi .value{font-size:24px;font-weight:700;margin:4px 0 0}
+.kpi .sub{font-size:12px;color:var(--muted);margin-top:4px}
+.kpi .flt-tag{position:absolute;top:12px;right:14px;font-size:10px;color:var(--muted);opacity:.7}
+.panel{background:var(--card);border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.05);padding:20px;height:100%}
+/* mini-indicadores */
+.mini{background:var(--card);border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.05);padding:14px 16px;height:100%;display:flex;align-items:center;gap:12px;transition:transform .2s}
+.mini:hover{transform:translateY(-2px)}
+.mini.mini-click{cursor:pointer}
+.mini.mini-click:hover{box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.mini.mini-active{box-shadow:0 0 0 2px var(--blue), 0 6px 16px rgba(13,110,253,.18)}
+.mini .mi-flt{font-size:9px;color:var(--blue);opacity:.55;margin-left:3px}
+.mini .mi-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 auto}
+.mini .mi-label{color:var(--muted);font-size:11.5px;font-weight:500;margin:0;line-height:1.2}
+.mini .mi-value{font-size:16px;font-weight:700;margin:2px 0 0;line-height:1.2}
+.mini .mi-sub{font-size:10.5px;color:var(--muted);margin-top:1px}
+/* insights */
+.insight{display:flex;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:12.5px;line-height:1.35}
+.insight:last-child{border-bottom:none}
+.insight i{margin-top:2px;font-size:13px;flex:0 0 auto}
+.insight b{font-weight:600}
+.panel h6{font-weight:700;font-size:15px;margin:0 0 2px}
+.panel .subtitle{color:var(--muted);font-size:12px;margin-bottom:14px}
+.table-wrap{background:var(--card);border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.05);padding:20px}
+table.dash td, table.dash th{vertical-align:middle;font-size:13.5px}
+table.dash thead th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.03em;border-bottom:2px solid var(--line)}
+.badge-status{font-size:11px;font-weight:600;padding:5px 10px;border-radius:20px;white-space:nowrap}
+.b-cotado{background:rgba(25,135,84,.14);color:#146c43}
+.b-pendente{background:rgba(255,193,7,.18);color:#997404}
+.b-critico{background:rgba(220,53,69,.14);color:#b02a37}
+tr.row-critico{background:rgba(220,53,69,.07)!important}
+tr.row-critico td{color:#b02a37!important}
+tr.row-critico td:first-child{box-shadow:inset 3px 0 0 #dc3545}
+.tag-critico{display:inline-block;font-size:10px;font-weight:700;color:#fff;background:#dc3545;border-radius:20px;padding:2px 8px;margin-left:6px;white-space:nowrap}
+.avatar-mini{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-right:8px}
+.page{display:none} .page.active{display:block; animation:fade .35s}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1035}
+.search-box{max-width:280px}
+.chart-box{position:relative;height:300px} .chart-box.sm{height:260px}
+.active-filter-bar{background:rgba(13,110,253,.08);border:1px solid rgba(13,110,253,.2);border-radius:10px;padding:8px 14px;font-size:13px;display:none;align-items:center;gap:10px}
+.active-filter-bar.show{display:flex}
+@media (max-width: 991.98px){
+  .sidebar{transform:translateX(-100%)} .sidebar.show{transform:translateX(0)}
+  .main{margin-left:0} .hamburger{display:block} .overlay.show{display:block}}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#ced4da;border-radius:8px}
+/* ============ LOGIN ============ */
+#loginScreen{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#575757 0%,#4a4a4a 100%);transition:opacity .3s ease;padding:20px}
+.login-card{background:#fff;border-radius:18px;padding:38px 34px;width:100%;max-width:380px;
+  box-shadow:0 20px 60px rgba(0,0,0,.35);text-align:center;animation:fade .4s}
+.login-logo{width:190px;max-width:80%;height:auto;border-radius:12px;margin:0 auto 18px;
+  background:#575757;display:flex;align-items:center;justify-content:center;padding:16px 18px}
+.login-logo img{width:100%;height:auto;display:block}
+.login-card h5{font-weight:700;margin:0 0 4px;color:#212529}
+.login-sub{color:var(--muted);font-size:13px;margin-bottom:22px}
+.login-field{position:relative;margin-bottom:14px}
+.login-field i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px}
+.login-field input{width:100%;padding:11px 14px 11px 40px;border:1px solid var(--line);border-radius:10px;font-size:14px;outline:none;transition:border .2s}
+.login-field input:focus{border-color:#575757;box-shadow:0 0 0 3px rgba(87,87,87,.15)}
+.login-error{display:none;background:rgba(220,53,69,.1);color:#b02a37;font-size:12.5px;padding:8px 12px;border-radius:8px;margin-bottom:14px;text-align:left}
+.login-btn{width:100%;padding:12px;border:none;border-radius:10px;background:#575757;color:#fff;font-weight:600;font-size:14px;cursor:pointer;transition:background .2s}
+.login-btn:hover{background:#4a4a4a}
+.login-foot{margin-top:20px;font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<!-- ================= TELA DE LOGIN ================= -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo"><img src="data:image/png;base64,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" alt="Grupo Vertical"></div>
+    <h5>Painel de Pendências</h5>
+    <p class="login-sub">Faça login para acessar o dashboard</p>
+    <div class="login-field">
+      <i class="fa-solid fa-user"></i>
+      <input type="text" id="loginUser" placeholder="Usuário" autocomplete="username">
+    </div>
+    <div class="login-field">
+      <i class="fa-solid fa-lock"></i>
+      <input type="password" id="loginPass" placeholder="Senha" autocomplete="current-password">
+    </div>
+    <div id="loginError" class="login-error"><i class="fa-solid fa-circle-exclamation"></i> Usuário ou senha inválidos.</div>
+    <button id="loginBtn" class="login-btn"><i class="fa-solid fa-right-to-bracket"></i> Entrar</button>
+    <div class="login-foot">© 2026 · Grupo Vertical</div>
+  </div>
+</div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <img class="brand-logo" src="data:image/png;base64,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" alt="Grupo Vertical">
+    <div class="brand-txt"><h6>Faturamento</h6><small>Controle de Pendências</small></div>
+  </div>
+  <div class="nav-section">Menu</div>
+  <nav class="nav flex-column">
+    <a class="nav-link active" data-page="overview" href="#"><i class="fa-solid fa-gauge-high"></i> Visão Geral</a>
+    <a class="nav-link" data-page="pendencias" href="#"><i class="fa-solid fa-list-check"></i> Pendências</a>
+    <a class="nav-link" data-page="analises" href="#"><i class="fa-solid fa-chart-pie"></i> Análises</a>
+    <a class="nav-link" data-page="importar" href="#"><i class="fa-solid fa-file-import"></i> Importar Dados</a>
+  </nav>
+  <div class="nav-section">Ações Rápidas</div>
+  <nav class="nav flex-column">
+    <a class="nav-link" href="#" id="btnExport"><i class="fa-solid fa-file-arrow-down"></i> Exportar Excel</a>
+    <a class="nav-link" href="#" id="btnPrint"><i class="fa-solid fa-print"></i> Imprimir Painel</a>
+    <a class="nav-link" href="#" id="btnLogout"><i class="fa-solid fa-right-from-bracket"></i> Sair</a>
+  </nav>
+  <div class="foot">
+    <div><i class="fa-regular fa-clock"></i> Atualizado: <span id="lastUpdate">--</span></div>
+    <div class="mt-1">© 2026 · Controladoria</div>
+    <div class="dev-credit">Desenvolvido por <b>Alice Virgínia</b><br><span>Grupo Vertical</span></div>
+  </div>
+</aside>
+<div class="overlay" id="overlay"></div>
+
+<div class="main">
+  <header class="topbar">
+    <div class="d-flex align-items-center gap-3">
+      <button class="hamburger" id="hamburger"><i class="fa-solid fa-bars"></i></button>
+      <div>
+        <h4 id="pageTitle" style="display:none"></h4>
+        <small id="pageSubtitle" style="display:none"></small>
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+    <!-- PÁGINA 1 · VISÃO GERAL -->
+    <section class="page active" id="page-overview">
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <span class="text-muted small me-1"><i class="fa-solid fa-filter"></i> Filtrar:</span>
+        <select class="form-select form-select-sm" style="width:auto" id="fMes"></select>
+        <select class="form-select form-select-sm" style="width:auto" id="fCliente"></select>
+        <select class="form-select form-select-sm" style="width:auto" id="fStatus"></select>
+        <button class="btn btn-sm btn-outline-secondary" id="fLimpar"><i class="fa-solid fa-eraser"></i> Limpar</button>
+      </div>
+
+      <div class="row g-3 mb-3" id="kpiRow"></div>
+
+      <!-- Faixa de mini-indicadores (resumo executivo) -->
+      <div class="row g-3 mb-3" id="miniRow"></div>
+
+      <div class="active-filter-bar mb-3" id="filterBar">
+        <i class="fa-solid fa-circle-info text-primary"></i>
+        <span id="filterBarText"></span>
+        <button class="btn btn-sm btn-outline-primary ms-auto py-0" id="filterBarClear"><i class="fa-solid fa-xmark"></i> Remover filtro</button>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+          <div class="panel">
+            <h6>Fluxo de Faturamento Pendente</h6>
+            <div class="subtitle">Evolução mensal do valor bruto a faturar (por mês da cirurgia)</div>
+            <div class="chart-box"><canvas id="chartLine"></canvas></div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="panel">
+            <h6>Distribuição por Status</h6>
+            <div class="subtitle">Participação de cada situação no total pendente</div>
+            <div class="chart-box sm"><canvas id="chartDonut"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Painéis analíticos adicionais na visão principal -->
+      <div class="row g-3 mb-4">
+        <div class="col-lg-5">
+          <div class="panel">
+            <h6>Top 5 Clientes</h6>
+            <div class="subtitle">Maiores exposições de faturamento pendente</div>
+            <div class="chart-box" style="height:280px"><canvas id="chartTop5"></canvas></div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="panel">
+            <h6>Aging da Carteira</h6>
+            <div class="subtitle">Valor pendente por faixa de dias em atraso</div>
+            <div class="chart-box" style="height:280px"><canvas id="chartAgingMini"></canvas></div>
+          </div>
+        </div>
+        <div class="col-lg-3">
+          <div class="panel h-100">
+            <h6>Destaques &amp; Alertas</h6>
+            <div class="subtitle">Insights automáticos da carteira</div>
+            <div id="insightsBox"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+          <div>
+            <h6 class="mb-0" style="font-weight:700">Pendências <span id="recentScope"></span></h6>
+            <small class="text-muted">Ordenadas por data de cirurgia</small>
+          </div>
+          <input type="text" class="form-control form-control-sm search-box" id="quickSearch" placeholder="🔍 Buscar cliente, paciente, plano...">
+        </div>
+        <div class="table-responsive">
+          <table class="table table-striped table-hover align-middle dash mb-0" id="tblRecent">
+            <thead><tr>
+              <th>ID</th><th>Cliente / Plano</th><th>Paciente</th><th>Data Cirurgia</th>
+              <th>Atraso</th><th class="text-end">Valor Bruto</th><th>Status</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PÁGINA 2 · PENDÊNCIAS -->
+    <section class="page" id="page-pendencias">
+      <div class="row g-2 mb-2">
+        <div class="col-md-3"><input class="form-control" id="pSearch" placeholder="🔍 Buscar..."></div>
+        <div class="col-md-3"><select class="form-select" id="pCliente"></select></div>
+        <div class="col-md-3"><select class="form-select" id="pGrupo"></select></div>
+        <div class="col-md-3"><select class="form-select" id="pPlano"></select></div>
+      </div>
+      <div class="row g-2 mb-3 align-items-center">
+        <div class="col-md-3"><select class="form-select" id="pStatus"></select></div>
+        <div class="col-md-3"><select class="form-select" id="pRepres"></select></div>
+        <div class="col-md-6 text-end"><span class="badge bg-secondary p-2" id="pCount">0 registros</span></div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-responsive">
+          <table class="table table-striped table-hover align-middle dash mb-0" id="tblFull">
+            <thead><tr>
+              <th>ID</th><th>Data</th><th>Cliente</th><th>Plano</th><th>Paciente</th>
+              <th>Hospital</th><th>Grupo</th><th>Portal</th><th>Pedido</th>
+              <th class="text-end">Valor</th><th>Atraso</th><th>Status</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PÁGINA 3 · ANÁLISES -->
+    <section class="page" id="page-analises">
+      <div class="row g-3 mb-4">
+        <div class="col-lg-7">
+          <div class="panel">
+            <h6>Top 10 Clientes por Valor Pendente</h6>
+            <div class="subtitle">Maiores exposições de faturamento a receber</div>
+            <div class="chart-box" style="height:360px"><canvas id="chartClientes"></canvas></div>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="panel">
+            <h6>Pendências por Faixa de Atraso</h6>
+            <div class="subtitle">Aging da carteira em dias corridos</div>
+            <div class="chart-box" style="height:360px"><canvas id="chartAging"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="panel">
+            <h6>Valor por Grupo de Cirurgia</h6>
+            <div class="subtitle">Composição do faturamento por especialidade</div>
+            <div class="chart-box"><canvas id="chartGrupo"></canvas></div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="panel">
+            <h6>Desempenho por Representante</h6>
+            <div class="subtitle">Valor pendente sob responsabilidade de cada representante</div>
+            <div class="chart-box"><canvas id="chartRepres"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="row g-3 mt-1">
+        <div class="col-lg-12">
+          <div class="panel">
+            <h6>Ticket Médio por Especialidade</h6>
+            <div class="subtitle">Valor médio pendente por cirurgia em cada especialidade (valor total ÷ nº de cirurgias)</div>
+            <div class="chart-box" style="height:400px"><canvas id="chartTicket"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PÁGINA 4 · IMPORTAR -->
+    <section class="page" id="page-importar">
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="panel text-center" style="padding:40px">
+            <div class="icon mx-auto" style="width:70px;height:70px;border-radius:18px;background:rgba(13,110,253,.12);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:18px">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <h6 style="font-weight:700">Importar Planilha de Pendências</h6>
+            <p class="text-muted">Carregue o arquivo <b>.xlsx</b> no mesmo formato do modelo (aba <i>"Pendencia dados"</i>). O painel será recalculado automaticamente.</p>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="form-control w-auto mx-auto" style="max-width:360px">
+            <div class="mt-3" id="importMsg"></div>
+            <div class="mt-3" id="fonteBadge"></div>
+            <hr class="my-4">
+            <div class="text-start small text-muted">
+              <b>Colunas esperadas:</b> Data cirurgia · Descricao grupo de cirurgia · Nome do medico · Paciente ·
+              Nome do hospital · Nome do cliente faturamento · Nome do plano de saude · Nome do representante ·
+              Valor bruto · Portal · pedido · observação
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<script>
+const RAW_DATA = [{"data":"2026-06-15","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"EDUARDO JOSE TENORIO SOUZA","hospital":"HOSPITAL SANTA JOANA","cliente":"AMIL PE","plano":"AMIL ASSISTENCIA MEDICA","representante":"CAIO BRUNO DE MEDEIROS","valor":6145.33,"portal":"INPART","pedido":1018326,"obs":null,"id":1,"posCirurgico":"sim"},{"data":"2026-06-28","grupo":"TRAUMA","medico":"ANTONIO AUGUSTO SANTIAGO SOBRINHO","paciente":"GEONETE SUASSUNA AMOURIM","hospital":"HOSPITAL PROMATER - RN","cliente":"AMIL PE","plano":"AMIL ASSISTENCIA MEDICA","representante":"TARCISIO SOUZA DOS SANTOS","valor":10520.49,"portal":null,"pedido":null,"obs":null,"id":2,"posCirurgico":"não"},{"data":"2026-07-06","grupo":"TRAUMA","medico":"MARCIO CABRAL FAGUNDES REGO","paciente":"JONATHAN WILLIAM LEAO CAVALCANTE","hospital":"HOSPITAL PROMATER NATAL","cliente":"AMIL PE","plano":"AMIL ASSISTENCIA MEDICA","representante":"TARCISIO SOUZA DOS SANTOS","valor":8297.48,"portal":null,"pedido":null,"obs":null,"id":3,"posCirurgico":"não"},{"data":"2026-07-10","grupo":"TRAUMA","medico":"WILSON DE MELLO ALVES JUNIOR","paciente":"EDVANIA DOS SANTOS","hospital":"HOSPITAL PROMATER - RN","cliente":"AMIL PE","plano":"AMIL ASSISTENCIA MEDICA","representante":"TARCISIO SOUZA DOS SANTOS","valor":7682.82,"portal":null,"pedido":null,"obs":null,"id":4,"posCirurgico":"não"},{"data":"2026-07-13","grupo":"TRAUMA","medico":"NAO INFORMADO","paciente":"DULCE MARINHO CORTEZ","hospital":"HOSPITAL PROMATER NATAL","cliente":"AMIL PE","plano":"AMIL ASSISTENCIA MEDICA","representante":"TARCISIO SOUZA DOS SANTOS","valor":6027.98,"portal":null,"pedido":null,"obs":null,"id":5,"posCirurgico":"sim"},{"data":"2026-07-08","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"SALOMAO PAULINO DA SILVA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"AMIL PE","plano":"AMIL ASSISTENCIA MEDICA","representante":"CAIO BRUNO DE MEDEIROS","valor":7200,"portal":null,"pedido":null,"obs":null,"id":6,"posCirurgico":"não"},{"data":"2026-07-08","grupo":"TRAUMA","medico":"NAO INFORMADO","paciente":"LUAN ALMEIDA DO NASCIMENTO","hospital":"HOSPITAL PROMATER NATAL","cliente":"AMIL PE","plano":"AMIL ASSISTENCIA MEDICA","representante":"TARCISIO SOUZA DOS SANTOS","valor":1815.67,"portal":null,"pedido":null,"obs":null,"id":7,"posCirurgico":"não"},{"data":"2026-07-16","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"SALOMAO PAULINO DA SILVA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"AMIL PE","plano":"AMIL ASSISTENCIA MEDICA","representante":"CAIO BRUNO DE MEDEIROS","valor":20456.9,"portal":null,"pedido":null,"obs":null,"id":8,"posCirurgico":"não"},{"data":"2026-06-30","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"ANA LETICIA DA SILVA MENDONCA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"AMIL PE","plano":"AMIL ASSISTENCIA MEDICA","representante":"CAIO BRUNO DE MEDEIROS","valor":21894.64,"portal":null,"pedido":null,"obs":null,"id":9,"posCirurgico":"não"},{"data":"2026-02-07","grupo":"TRAUMA","medico":"GISELLY VERISSIMO DE MIRANDA","paciente":"IVANIA MORAIS VASCONCELOS","hospital":"HOF","cliente":"BRADESCO SAUDE - OPERADORA DE PLANO","plano":"BRADESCO","representante":"CAIO BRUNO DE MEDEIROS","valor":4000,"portal":null,"pedido":null,"obs":null,"id":10,"posCirurgico":"sim"},{"data":"2026-03-11","grupo":"TRAUMA","medico":"LUCIANO PAES KRAUSE GONCALVES","paciente":"JANAINA DE CASSIA SOARES DA COSTA","hospital":"HOF","cliente":"BRADESCO SAUDE - OPERADORA DE PLANO","plano":"BRADESCO","representante":"CAIO BRUNO DE MEDEIROS","valor":4150,"portal":null,"pedido":null,"obs":null,"id":11,"posCirurgico":"sim"},{"data":"2026-03-18","grupo":"TRAUMA","medico":"GUSTAVO JOSE CANTO DE FREITAS","paciente":"DJANIRA CARVALHO MOURA E SILVA NETA DO N","hospital":"HOF","cliente":"BRADESCO SAUDE - OPERADORA DE PLANO","plano":"BRADESCO","representante":"CAIO BRUNO DE MEDEIROS","valor":1980,"portal":null,"pedido":null,"obs":null,"id":12,"posCirurgico":"sim"},{"data":"2026-07-08","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"ERIVELTON MENEZES DO NASCIMENTO","hospital":"REAL HOSPITAL PORTUGUES","cliente":"BRADESCO SAUDE S/A","plano":"BRADESCO","representante":"CAIO BRUNO DE MEDEIROS","valor":237.21,"portal":"TOP SAUDE","pedido":"234926 / K3FSQ47","obs":null,"id":13,"posCirurgico":"sim"},{"data":"2026-07-22","grupo":"MEDICINA ESPORTIVA","medico":"RICARDO BARRETO MONTEIRO DOS SANTOS","paciente":"MARCOS SAMUELSON LINS LOPES","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"BRADESCO SAUDE S/A","plano":"BRADESCO","representante":"CAIO BRUNO DE MEDEIROS","valor":8799.84,"portal":null,"pedido":null,"obs":null,"id":14,"posCirurgico":"sim"},{"data":"2026-07-31","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"MARIA ELISA DE OLIVEIRA CARNAVAL","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"BRADESCO SAUDE S/A","plano":"BRADESCO","representante":"CAIO BRUNO DE MEDEIROS","valor":10533.17,"portal":null,"pedido":"A-29339","obs":null,"id":15,"posCirurgico":"não"},{"data":"2026-07-29","grupo":"TRAUMA","medico":"ALVARO GONCALVES  DA COSTA LIMA NET","paciente":"ADRIANE CEZAR BARROS GUEIROS","hospital":"HOF","cliente":"BRADESCO SAUDE S/A","plano":"BRADESCO","representante":"CAIO BRUNO DE MEDEIROS","valor":2240.28,"portal":null,"pedido":"A-29222","obs":null,"id":16,"posCirurgico":"sim"},{"data":"2026-07-31","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"EDSON MENDONCA DOS SANTOS","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"BRADESCO SAUDE S/A","plano":"BRADESCO","representante":"CAIO BRUNO DE MEDEIROS","valor":7200,"portal":null,"pedido":"A-29414","obs":null,"id":17,"posCirurgico":"sim"},{"data":"2026-07-30","grupo":"TRAUMA","medico":"FABIO NEUMANN KAUFFMAN","paciente":"MARIO GUIMARAES DE SOUZA NETO","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"BRADESCO SAUDE S/A","plano":"BRADESCO","representante":"CAIO BRUNO DE MEDEIROS","valor":8303.34,"portal":null,"pedido":"A-29309","obs":null,"id":18,"posCirurgico":"sim"},{"data":"2026-07-31","grupo":"ELETROFISIOLOGIA","medico":"IREMAR SALVIANO DE MACEDO NETO","paciente":"MARIO DA SILVA CORDEIRO","hospital":"REAL HOSPITAL PORTUGUES","cliente":"BRADESCO SAUDE S/A","plano":"BRADESCO","representante":"SAMUEL SEABRA GUIMARAES","valor":44500.93,"portal":null,"pedido":null,"obs":null,"id":19,"posCirurgico":"sim"},{"data":"2026-07-21","grupo":"TRAUMA","medico":"ROBERTA PAES BARRETO GOMES","paciente":"ROSSANA ALLAIN TEIXEIRA GALVAO","hospital":"CLINICA DE FRATURAS E REABILITACAO","cliente":"CLINICA DE FRATURAS E REABILITACAO","plano":"FISCO SAUDE - PE","representante":"CAIO BRUNO DE MEDEIROS","valor":22319.2,"portal":null,"pedido":"A-28766","obs":null,"id":20,"posCirurgico":"sim"},{"data":"2026-05-28","grupo":"TRAUMA","medico":"IANELE BRAGA VILELA DE MELO COSTA","paciente":"WALDEMIR JOSE DA SILVA","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"COMPESAPREV","plano":"FUNDACAO COMPESA","representante":"CAIO BRUNO DE MEDEIROS","valor":10803.1,"portal":"OPMENEXO","pedido":5928664,"obs":null,"id":21,"posCirurgico":"sim"},{"data":"2025-12-21","grupo":"TRAUMA","medico":"FELIPE SILVA FRAGOSO","paciente":"YARA MARIA CAVALCANTI DE QUEIROZ","hospital":"HOSPITAL SAO MARCOS","cliente":"GEAP","plano":"GEAP SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":22082.3,"portal":null,"pedido":null,"obs":null,"id":22,"posCirurgico":"não"},{"data":"2026-02-11","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"MARIA JOSE DA SILVA","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"GEAP","plano":"GEAP SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":15229.45,"portal":null,"pedido":null,"obs":null,"id":23,"posCirurgico":"não"},{"data":"2026-03-05","grupo":"TRAUMA","medico":"DANIEL BARRETO DE MATOS NOBRE","paciente":"MARIA IZAURA LEAL MAIA","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"GEAP","plano":"GEAP SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":15436.45,"portal":null,"pedido":null,"obs":null,"id":24,"posCirurgico":"não"},{"data":"2026-03-09","grupo":"TRAUMA","medico":"CICERO ANDRE GOMES RIBEIRO","paciente":"NEREIDE LINO CANTO REBOLCAS","hospital":"HOSPITAL SAO MARCOS","cliente":"GEAP","plano":"GEAP SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":17111.08,"portal":null,"pedido":null,"obs":null,"id":25,"posCirurgico":"não"},{"data":"2026-04-06","grupo":"TRAUMA","medico":"MARCOS HENRIQUES LYRA FILHO","paciente":"MARIA DO SOCORRO PARENTE SARAIVA","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"GEAP","plano":"GEAP SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":16256.4,"portal":null,"pedido":25650,"obs":null,"id":26,"posCirurgico":"não"},{"data":"2026-05-11","grupo":"TRAUMA","medico":"ANDRE VITOR DE ANDRADE GOMES","paciente":"DORALICE MARIA DA CONCEICAO","hospital":"HOSPITAL SAO MARCOS","cliente":"GEAP","plano":"GEAP SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":26473.92,"portal":"INPART","pedido":"A-26518","obs":null,"id":27,"posCirurgico":"não"},{"data":"2026-07-16","grupo":"TRAUMA","medico":"ALVARO GONCALVES  DA COSTA LIMA NET","paciente":"MARCOS FILIPE SOARES NASCIMENTO","hospital":"HOF","cliente":"HOF","plano":"ASSOCIACAO FCA SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":5002.5,"portal":null,"pedido":"A-28603","obs":null,"id":28,"posCirurgico":"sim"},{"data":"2026-02-03","grupo":"ELETROFISIOLOGIA","medico":"RICARDO SERGIO FIGUEIREDO SILVA","paciente":"ROBERTO FRANCISCO DOS SANTOS","hospital":"MAXIMAGEM DIAGNOSTICO POR IMAGEM LT","cliente":"HOSPITAL MEMORIAL SAO JOSE","plano":"PLAN ASSISTE","representante":"SAMUEL SEABRA GUIMARAES","valor":3090.45,"portal":"OPMENEXO","pedido":5347932,"obs":null,"id":29,"posCirurgico":"sim"},{"data":"2026-04-20","grupo":"ELETROFISIOLOGIA","medico":"JOSE NILO DE CARVALHO NETO","paciente":"ANSELMO RENATO ALVES GAMA DE LIMA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"HOSPITAL MEMORIAL SAO JOSE","plano":"BRADESCO","representante":"SAMUEL SEABRA GUIMARAES","valor":750,"portal":"OPMENEXO","pedido":5595556,"obs":null,"id":30,"posCirurgico":"sim"},{"data":"2026-05-20","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"JOAO LUCAS NEVES MENDES DOS SANTOS","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"HOSPITAL ESPERANCA OLINDA","plano":"BRADESCO","representante":"CAIO BRUNO DE MEDEIROS","valor":1100,"portal":"OPMENEXO","pedido":5850189,"obs":null,"id":31,"posCirurgico":"sim"},{"data":"2026-06-11","grupo":"TRAUMA","medico":"THIAGO DE PAULA BARBOSA COUTINHO","paciente":"KARLA SIMOES DE ANDRADE LIMA BERTOTTI","hospital":"HOSPITAL SAO MARCOS","cliente":"HOSPITAL SAO MARCOS","plano":"ASSEFAZ","representante":"CAIO BRUNO DE MEDEIROS","valor":18187.02,"portal":"OPMENEXO","pedido":5829977,"obs":null,"id":32,"posCirurgico":""},{"data":"2026-06-17","grupo":"JOELHO","medico":"ODILMAR BARBOSA E SILVA","paciente":"NORMA MELO DE ARAUJO FERREIRA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"HOSPITAL MEMORIAL SAO JOSE","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"TARCISIO SOUZA DOS SANTOS","valor":10573.86,"portal":"OPMENEXO","pedido":5672081,"obs":null,"id":33,"posCirurgico":"sim"},{"data":"2026-06-24","grupo":"VINCULA - QUADRIL","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"ALMERISE RAMOS SILVA DE ARAUJO","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"HOSPITAL ESPERANCA RECIFE","plano":"FUSEX (EXERCITO)","representante":"CAIO BRUNO DE MEDEIROS","valor":11410.28,"portal":"OPMENEXO","pedido":5973813,"obs":null,"id":34,"posCirurgico":""},{"data":"2026-07-01","grupo":"MEDICINA ESPORTIVA","medico":"THIAGO SERPA DE AZEVEDO SILVA","paciente":"ANTONIO JOSE PIMENTEL","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"HOSPITAL ESPERANCA RECIFE","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":9855.66,"portal":null,"pedido":null,"obs":null,"id":35,"posCirurgico":"sim"},{"data":"2026-07-13","grupo":"TRAUMA","medico":"SANDRELLI ARAUJO MELO","paciente":"KATIA CIBELE DE SOUZA LIMA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"HOSPITAL MEMORIAL SAO JOSE","plano":"BRADESCO","representante":"CAIO BRUNO DE MEDEIROS","valor":4550,"portal":"OPMENEXO","pedido":6001390,"obs":null,"id":36,"posCirurgico":"sim"},{"data":"2026-07-14","grupo":"QUADRIL","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"EUNICE PEREIRA COSTA GODEFFROY","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"HOSPITAL ESPERANCA OLINDA","plano":"BRADESCO","representante":"TARCISIO SOUZA DOS SANTOS","valor":13875.66,"portal":"OPMENEXO","pedido":6018348,"obs":null,"id":37,"posCirurgico":"sim"},{"data":"2026-07-15","grupo":"MEDICINA ESPORTIVA","medico":"THIAGO DE PAULA BARBOSA COUTINHO","paciente":"ROMUALDO FRANCISCO DE BARROS","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"HOSPITAL ESPERANCA OLINDA","plano":"SAUDE CAIXA","representante":"CAIO BRUNO DE MEDEIROS","valor":6380.87,"portal":"OPMENEXO","pedido":5933450,"obs":null,"id":38,"posCirurgico":"sim"},{"data":"2026-07-15","grupo":"TRAUMA","medico":"GABRIEL PRAXEDES DE LIMA","paciente":"AGUINALDO NEVES DE OLIVEIRA JUNIOR","hospital":"HOSPITAL SAO MARCOS","cliente":"HOSPITAL SAO MARCOS","plano":"ASSEFAZ","representante":"CAIO BRUNO DE MEDEIROS","valor":19171.88,"portal":"OPMENEXO","pedido":6036337,"obs":null,"id":39,"posCirurgico":""},{"data":"2026-07-16","grupo":"TRAUMA","medico":"IANELE BRAGA VILELA DE MELO COSTA","paciente":"MARCOS VINICIUS LOPES","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"HOSPITAL ESPERANCA OLINDA","plano":"PARTICULAR","representante":"CAIO BRUNO DE MEDEIROS","valor":27600,"portal":"OPMENEXO","pedido":6009403,"obs":null,"id":40,"posCirurgico":"sim"},{"data":"2026-07-17","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"LUCIA MARIA BRITO MONTEIRO DA CRUZ RIBEI","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"HOSPITAL ESPERANCA RECIFE","plano":"FISCO SAUDE - PE","representante":"CAIO BRUNO DE MEDEIROS","valor":15424.95,"portal":null,"pedido":null,"obs":null,"id":41,"posCirurgico":"sim"},{"data":"2026-07-24","grupo":"VINCULA - QUADRIL","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"PAULO SILVA LUNA","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"HOSPITAL ESPERANCA RECIFE","plano":"ASSEFAZ","representante":"CAIO BRUNO DE MEDEIROS","valor":13285.22,"portal":null,"pedido":null,"obs":null,"id":42,"posCirurgico":"sim"},{"data":"2026-06-05","grupo":"ELETROFISIOLOGIA","medico":"JULIO CESAR VIEIRA DE SOUSA","paciente":"HIPOLITO VIRGILIO MAGALHAES JUNIOR","hospital":"HOSPITAL PROMATER NATAL","cliente":"HOSPITAL PROMATER NATAL","plano":"AMIL ASSISTENCIA MEDICA","representante":"SAMUEL SEABRA GUIMARAES","valor":180,"portal":"INPART","pedido":483,"obs":null,"id":43,"posCirurgico":""},{"data":"2026-08-04","grupo":"JOELHO","medico":"NAO INFORMADO","paciente":"IVONE SILVESTRE REIS BRAILE","hospital":"HOSPITAL PROMATER NATAL","cliente":"HOSPITAL PROMATER NATAL","plano":"SAUDE CAIXA","representante":"GRUPO VERTICAL","valor":17200,"portal":null,"pedido":null,"obs":null,"id":44,"posCirurgico":""},{"data":"2026-04-07","grupo":"MEDICINA ESPORTIVA","medico":"RAFAEL CANTINHO LEMOS DANTAS","paciente":"ELIAS CORREIA ALVES JUNIOR","hospital":"HOSPITAL SANTA JOANA","cliente":"HOSPITAL SANTA JOANA","plano":"AMIL ASSISTENCIA MEDICA","representante":"TARCISIO SOUZA DOS SANTOS","valor":3195.29,"portal":null,"pedido":null,"obs":null,"id":45,"posCirurgico":"não"},{"data":"2026-07-20","grupo":"TRAUMA","medico":"AYRON FERRAZ GOMES FILHO","paciente":"ARTHUR PAULO DE SOUZA NETO","hospital":"HOSPITAL SANTA JOANA","cliente":"HOSPITAL SANTA JOANA","plano":"AMIL ASSISTENCIA MEDICA","representante":"CAIO BRUNO DE MEDEIROS","valor":24322.08,"portal":null,"pedido":"A-28757","obs":null,"id":46,"posCirurgico":"não"},{"data":"2026-07-22","grupo":"TRAUMA","medico":"NAO INFORMADO","paciente":"GAEL BARROS PINHEIRO","hospital":"HOSPITAL SANTA JOANA","cliente":"HOSPITAL SANTA JOANA","plano":"ASSEFAZ","representante":"CAIO BRUNO DE MEDEIROS","valor":3898.22,"portal":"INPART","pedido":9368,"obs":null,"id":47,"posCirurgico":"sim"},{"data":"2026-07-24","grupo":"ELETROFISIOLOGIA","medico":"JOSE NILO DE CARVALHO NETO","paciente":"LUZIA MARIA DE NOVAES ALECRIM","hospital":"HOSPITAL SANTA JOANA","cliente":"HOSPITAL SANTA JOANA","plano":"AMIL ASSISTENCIA MEDICA","representante":"SAMUEL SEABRA GUIMARAES","valor":30049.89,"portal":"INPART","pedido":9049,"obs":null,"id":48,"posCirurgico":""},{"data":"2026-07-30","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"JUDITE SEVERINA DE OLIVEIRA LYRA","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"HOSPITAL ESPERANCA RECIFE","plano":"BANCO CENTRAL","representante":"CAIO BRUNO DE MEDEIROS","valor":15022.45,"portal":null,"pedido":null,"obs":null,"id":49,"posCirurgico":"sim"},{"data":"2026-07-30","grupo":"TRAUMA","medico":"CLAUDIO DE OLIVEIRA ANDRADE MARQUES","paciente":"ZELIA MARIA DE NOVAES CARNEIRO CAMPELO","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"HOSPITAL MEMORIAL SAO JOSE","plano":"CAIXA 01 - CAIXA","representante":"CAIO BRUNO DE MEDEIROS","valor":15424.95,"portal":null,"pedido":null,"obs":null,"id":50,"posCirurgico":"sim"},{"data":"2026-05-03","grupo":"CARDIOVASCULAR","medico":"FREDERICO BARCELOS EVANGELISTA","paciente":"RAIMUNDA WANDERLANIA R DOS SANTOS","hospital":"REAL HOSPITAL PORTUGUES","cliente":"MEDSENIOR SERVICOS EM SAUDE LTDA","plano":"MEDSENIOR","representante":"TARCISIO SOUZA DOS SANTOS","valor":4500,"portal":"OPMENEXO","pedido":5853225,"obs":null,"id":51,"posCirurgico":""},{"data":"2026-01-09","grupo":"TRAUMA","medico":"CARLOS HENRIQUE CARVALHO DE QUEIROZ","paciente":"ROBSON GAMA PINHEIRO","hospital":"REAL HOSPITAL PORTUGUES","cliente":"REAL HOSPITAL PORTUGUES","plano":"POSTAL SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":5160,"portal":"OPMENEXO","pedido":5520893,"obs":null,"id":52,"posCirurgico":""},{"data":"2026-07-01","grupo":"TRAUMA","medico":"ADLAY DANIELLE MENEZES RODRIGUES DO","paciente":"MIZAEL RIBEIRO DA FONSECA","hospital":"REAL HOSPITAL PORTUGUES","cliente":"REAL HOSPITAL PORTUGUES","plano":"POSTAL SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":10890,"portal":"OPMENEXO","pedido":5952075,"obs":null,"id":53,"posCirurgico":""},{"data":"2026-06-27","grupo":"VINCULA - QUADRIL","medico":"ELDER DE VASCONCELOS CARVALHO","paciente":"IRACEMA DA SILVA ALCOFORADO","hospital":"REAL HOSPITAL PORTUGUES","cliente":"REAL HOSPITAL PORTUGUES","plano":"GEAP SAUDE","representante":"TARCISIO SOUZA DOS SANTOS","valor":12200,"portal":"OPMENEXO","pedido":5987325,"obs":null,"id":54,"posCirurgico":""},{"data":"2026-07-25","grupo":"ELETROFISIOLOGIA","medico":"IREMAR SALVIANO DE MACEDO NETO","paciente":"EVERALDO LOPES DA SILVA","hospital":"REAL HOSPITAL PORTUGUES","cliente":"REAL HOSPITAL PORTUGUES","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"SAMUEL SEABRA GUIMARAES","valor":67694.29,"portal":null,"pedido":null,"obs":null,"id":55,"posCirurgico":""},{"data":"2026-07-23","grupo":"TRAUMA","medico":"ANTONIO JOSE OLIVEIRA DE ALBUQUERQU","paciente":"VALDIZIA MARIA DOS SANTOS SILVA","hospital":"REAL HOSPITAL PORTUGUES","cliente":"REAL HOSPITAL PORTUGUES","plano":"POSTAL SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":15424.95,"portal":null,"pedido":null,"obs":null,"id":56,"posCirurgico":""},{"data":"2026-03-25","grupo":"QUADRIL","medico":"CLAUDIO DE OLIVEIRA ANDRADE MARQUES","paciente":"FERNANDO SEIXAS VIEGAS","hospital":"REAL HOSPITAL PORTUGUES","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"TARCISIO SOUZA DOS SANTOS","valor":4858.42,"portal":null,"pedido":null,"obs":null,"id":57,"posCirurgico":""},{"data":"2026-03-16","grupo":"TRAUMA","medico":"ANTONIO JOSE OLIVEIRA DE ALBUQUERQU","paciente":"EDUARDO VINICIUS NUNES DE CASTRO","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":15280,"portal":null,"pedido":null,"obs":null,"id":58,"posCirurgico":""},{"data":"2026-05-01","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"GUSTAVO DAS NEVES SILVA","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":450,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":59,"posCirurgico":""},{"data":"2026-05-11","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"ANNA LUIZA SOARES DE MEDEIROS","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":3148.75,"portal":null,"pedido":null,"obs":null,"id":60,"posCirurgico":""},{"data":"2026-05-24","grupo":"TRAUMA","medico":"PABLO MOURA DE ANDRADE LIMA","paciente":"CRISTINA PEREIRA DE ARAUJO","hospital":"HOF","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":8216.83,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":61,"posCirurgico":""},{"data":"2026-05-22","grupo":"TRAUMA","medico":"IANELE BRAGA VILELA DE MELO COSTA","paciente":"ADRIELLY VITORIA NASCIMENTO DA SILVA","hospital":"HOSPITAL SAO MARCOS","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":2383.5,"portal":null,"pedido":null,"obs":null,"id":62,"posCirurgico":""},{"data":"2026-05-04","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"CARLA MAGDA ULISSES SARAIVA","hospital":"HOSPITAL SAO MARCOS","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":7757.91,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":63,"posCirurgico":""},{"data":"2026-06-02","grupo":"TRAUMA","medico":"FABILSON ANDRE CAVALCANTE SILVA","paciente":"WYLLIAN RABELLO GUERRA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":4807.17,"portal":null,"pedido":null,"obs":null,"id":64,"posCirurgico":""},{"data":"2026-06-04","grupo":"TRAUMA","medico":"FABILSON ANDRE CAVALCANTE SILVA","paciente":"MARIA CRISTINA HALLA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":2378.43,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":65,"posCirurgico":""},{"data":"2026-06-09","grupo":"TRAUMA","medico":"GABRIEL PRAXEDES DE LIMA","paciente":"LEONARDO ALMEIDA BEZERRA LEITE","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":5947.32,"portal":null,"pedido":null,"obs":null,"id":66,"posCirurgico":""},{"data":"2026-05-22","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"MATHEUS BARROS DE LIMA","hospital":"HOSPITAL SAO MARCOS","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":3803.85,"portal":null,"pedido":null,"obs":null,"id":67,"posCirurgico":""},{"data":"2026-06-15","grupo":"TRAUMA","medico":"JEFFERSON CALUME DE OLIVEIRA JUNIOR","paciente":"FRANCISCO DE ASSIS DE ANDRADA JURUBEBA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":7657.79,"portal":null,"pedido":null,"obs":null,"id":68,"posCirurgico":""},{"data":"2026-06-03","grupo":"TRAUMA","medico":"CLEBER MACIEL DE MORAES PRAZERES","paciente":"GILVANDA PEREIRA FEITOSA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":4835.83,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":69,"posCirurgico":""},{"data":"2026-06-05","grupo":"TRAUMA","medico":"CLEBER MACIEL DE MORAES PRAZERES","paciente":"MARIA CRISTINA HALLA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":14841.05,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":70,"posCirurgico":""},{"data":"2026-06-08","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"ANDREIA DE OLIVEIRA BELAUS","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":18544,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":71,"posCirurgico":""},{"data":"2026-06-19","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"KETLYN SOPHIA ASSUNCAO DE ALMEIDA","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":250.17,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":72,"posCirurgico":""},{"data":"2026-06-03","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"ANDREIA DE OLIVEIRA BELAUS","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":7200,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":73,"posCirurgico":""},{"data":"2026-06-17","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"MARIA TEREZA DE MORAIS SILVA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":4136.65,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":74,"posCirurgico":""},{"data":"2026-06-25","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"JULIO CURVELO PEDROSA","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":4450.69,"portal":null,"pedido":null,"obs":null,"id":75,"posCirurgico":""},{"data":"2026-06-28","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"TEREZA HELENA DE ANDRADE COSTA CAVALCANT","hospital":"HOSPITAL SAO MARCOS","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":8570.01,"portal":null,"pedido":null,"obs":null,"id":76,"posCirurgico":""},{"data":"2026-06-22","grupo":"TRAUMA","medico":"DANIEL BARRETO DE MATOS NOBRE","paciente":"IAN MATHEUS FARIAS MONTEIRO","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":5792.21,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":77,"posCirurgico":""},{"data":"2026-07-02","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"MARCOS PASCOAL FLORENCIO","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":12416.62,"portal":null,"pedido":null,"obs":null,"id":78,"posCirurgico":""},{"data":"2026-06-24","grupo":"TRAUMA","medico":"THIAGO HENRIQUE SILVEIRA DE ANDRADE","paciente":"REGINA MARIA DELGADO JARDIM","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":9998.73,"portal":null,"pedido":null,"obs":null,"id":79,"posCirurgico":""},{"data":"2026-07-08","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"ZENILDE MENEZES DE CARVALHO","hospital":"HOSPITAL SAO MARCOS","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":450,"portal":null,"pedido":null,"obs":null,"id":80,"posCirurgico":""},{"data":"2026-07-01","grupo":"TRAUMA","medico":"SANDRELLI ARAUJO MELO","paciente":"MARGARIDA MARIA CAVALCANTI DE MORAIS","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":1590.38,"portal":null,"pedido":null,"obs":null,"id":81,"posCirurgico":""},{"data":"2026-06-22","grupo":"TRAUMA","medico":"CLEBER MACIEL DE MORAES PRAZERES","paciente":"SIMONE DE LIMA RAPOSO PEDROSA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":8032.9,"portal":null,"pedido":null,"obs":null,"id":82,"posCirurgico":""},{"data":"2026-06-24","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"THAYANE MARINHO SOARES","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":7200,"portal":null,"pedido":null,"obs":null,"id":83,"posCirurgico":""},{"data":"2026-07-07","grupo":"TRAUMA","medico":"NAO INFORMADO","paciente":"ROBERT MIGUEL DA SILVA","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":6796.89,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":84,"posCirurgico":""},{"data":"2026-06-29","grupo":"TRAUMA","medico":"ALEXANDRE DE ALBUQUERQUE GALVAO","paciente":"ZELIA MARIA PEREIRA CUNHA","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"TARCISIO SOUZA DOS SANTOS","valor":8550,"portal":null,"pedido":null,"obs":null,"id":85,"posCirurgico":""},{"data":"2026-07-15","grupo":"TRAUMA","medico":"MARCOS HENRIQUES LYRA FILHO","paciente":"ALVARO GUEDES DE AZEVEDO SILVA","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":10925,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":86,"posCirurgico":""},{"data":"2026-07-15","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"LUZENE CARVALHO DE ALMEIDA","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":9998.73,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":87,"posCirurgico":""},{"data":"2026-07-16","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"MARIA HELENA BERNADINO DE MORAIS","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":7906.59,"portal":null,"pedido":null,"obs":null,"id":88,"posCirurgico":""},{"data":"2026-07-21","grupo":"TRAUMA","medico":"ANDRE VITOR DE ANDRADE GOMES","paciente":"PAULO FERNANDO MONTEIRO DE MELO","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":7273.69,"portal":null,"pedido":null,"obs":null,"id":89,"posCirurgico":""},{"data":"2026-07-22","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"NERCI FERREIRA DA SILVA","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":10601.59,"portal":null,"pedido":null,"obs":null,"id":90,"posCirurgico":""},{"data":"2026-07-26","grupo":"TRAUMA","medico":"FABIO BRANDAO DE ALMEIDA","paciente":"JOSE EDUARDO GUEIROS DA FONSECA LINS","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":4901.55,"portal":null,"pedido":null,"obs":null,"id":91,"posCirurgico":""},{"data":"2026-07-26","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"ISABEL CHRISTINA DE OLIVEIRA","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":455.54,"portal":null,"pedido":null,"obs":null,"id":92,"posCirurgico":""},{"data":"2026-05-22","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"JOAO BIBIANO DE SOUZA","hospital":"HOSPITAL SAO MARCOS","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":9805.76,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":93,"posCirurgico":""},{"data":"2026-07-27","grupo":"TRAUMA","medico":"JEFFERSON CALUME DE OLIVEIRA JUNIOR","paciente":"LIANA MARIA CYRENO COELHO","hospital":"HOSPITAL MEMORIAL SAO JOSE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":8794.89,"portal":null,"pedido":null,"obs":null,"id":94,"posCirurgico":""},{"data":"2026-05-18","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"ROSALIE ELISABETH FARRANT CORREIA DE ARA","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":13938.47,"portal":null,"pedido":null,"obs":null,"id":95,"posCirurgico":""},{"data":"2026-07-20","grupo":"TRAUMA","medico":"MARCOS HENRIQUES LYRA FILHO","paciente":"MARCOS ANTONIO SILVA","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":5668.7,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":96,"posCirurgico":""},{"data":"2026-07-26","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"ANTONIO FLORENTINO MOREIRA COUTO","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":9998.73,"portal":null,"pedido":null,"obs":null,"id":97,"posCirurgico":""},{"data":"2026-07-28","grupo":"TRAUMA","medico":"MARCOS HENRIQUES LYRA FILHO","paciente":"TEREZINHA BERNADI CHILO","hospital":"HOSPITAL ESPERANCA OLINDA","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":9998.73,"portal":null,"pedido":null,"obs":null,"id":98,"posCirurgico":""},{"data":"2026-07-31","grupo":"TRAUMA","medico":"DANIEL CAMPOS DOS SANTOS","paciente":"GIVALDO FERREIRA PONTES FILHO","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":3508.5,"portal":null,"pedido":null,"obs":null,"id":99,"posCirurgico":""},{"data":"2026-07-11","grupo":"TRAUMA","medico":"MARCOS HENRIQUES LYRA FILHO","paciente":"ALVARO GUEDES DE AZEVEDO SILVA","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":15153.04,"portal":"SULAMERICA SALES F","pedido":null,"obs":null,"id":100,"posCirurgico":""},{"data":"2026-07-14","grupo":"TRAUMA","medico":"MARILIA AGOSTINHO DE LIMA GOMES","paciente":"JOAO PAULO ROSA CESSE JUNIOR","hospital":"HOSPITAL SAO MARCOS","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":16161.61,"portal":null,"pedido":null,"obs":null,"id":101,"posCirurgico":""},{"data":"2026-08-06","grupo":"TRAUMA","medico":"LUCAS SEVERO BONILHA DE SOUZA","paciente":"AUXILIADORA MARIA PIRES SIQUEIRA DA CUNH","hospital":"HOSPITAL ESPERANCA RECIFE","cliente":"SULAMERICA COMPANHIA DE SEGURO SA","plano":"SULAMERICA CIA DE SEGURO SAUDE","representante":"CAIO BRUNO DE MEDEIROS","valor":12068.22,"portal":null,"pedido":null,"obs":null,"id":102,"posCirurgico":""},{"data":"2026-07-13","grupo":"JOELHO","medico":"NAO INFORMADO","paciente":"SEVERINO FERREIRA JUNIOR","hospital":"UNIMED C. GRANDE COOPERATIVA DE TRA","cliente":"UNIMED C. GRANDE COOPERATIVA DE TRA","plano":"UNIMED CAMPINA GRANDE PB","representante":"TARCISIO SOUZA DOS SANTOS","valor":12230,"portal":"GTPLAN","pedido":673051,"obs":"cobrado a Erlanea","id":103,"posCirurgico":""},{"data":"2026-06-27","grupo":"QUADRIL","medico":"BRENO COUTINHO TORRES","paciente":"AUZENI ANDRADE MATSUBAYASHI","hospital":"UNIMED JOAO PESSOA","cliente":"CASSI PERNAMBUCO","plano":"CASSI","representante":"TARCISIO SOUZA DOS SANTOS","valor":24350.61,"portal":null,"pedido":null,"obs":"cobrado a Diane o envio deste processo novamente","id":104,"posCirurgico":"não"},{"data":"2026-07-31","grupo":"ELETROFISIOLOGIA","medico":"JULIO CESAR VIEIRA DE SOUSA","paciente":"JULIO CESAR SOUZA DOS SANTOS","hospital":"UNIMED NATAL","cliente":"UNIMED NATAL","plano":"UNIMED NATAL","representante":"SAMUEL SEABRA GUIMARAES","valor":58821.3,"portal":null,"pedido":null,"obs":"fora do prazo, avaliar faturamento a revelia","id":105,"posCirurgico":""},{"data":"2026-07-01","grupo":"JOELHO","medico":"RAFAEL CANTINHO LEMOS DANTAS","paciente":"LUCCAS OLIVEIRA MARINHO DA SILVA","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"TARCISIO SOUZA DOS SANTOS","valor":11800,"portal":"OPMENEXO","pedido":5623442,"obs":"fora do prazo de liberação","id":106,"posCirurgico":""},{"data":"2026-07-07","grupo":"JOELHO","medico":"LEONARDO DE LIMA SILVEIRA","paciente":"CARMEN LUCIA BATISTA DA SILVA","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"CAIO BRUNO DE MEDEIROS","valor":7700,"portal":"OPMENEXO","pedido":5891146,"obs":"fora do prazo de liberação","id":107,"posCirurgico":""},{"data":"2026-07-08","grupo":"JOELHO","medico":"RAFAEL CANTINHO LEMOS DANTAS","paciente":"ROSA MARIA OLIVEIRA DE LIMA","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"TARCISIO SOUZA DOS SANTOS","valor":11800,"portal":"OPMENEXO","pedido":5856036,"obs":"fora do prazo de liberação","id":108,"posCirurgico":""},{"data":"2026-07-13","grupo":"TRAUMA","medico":"EDUARDO VIEIRA AKEL","paciente":"ANA FLORIPES CAMINHA SILVA","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"CAIO BRUNO DE MEDEIROS","valor":3000,"portal":null,"pedido":null,"obs":"Sem ID","id":109,"posCirurgico":""},{"data":"2026-07-20","grupo":"ELETROFISIOLOGIA","medico":"IREMAR SALVIANO DE MACEDO NETO","paciente":"TEREZA CRISTINA LOUREIRO MEDINA","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"SAMUEL SEABRA GUIMARAES","valor":20346.02,"portal":"OPMENEXO","pedido":5924480,"obs":"fora do prazo de liberação","id":110,"posCirurgico":""},{"data":"2026-07-08","grupo":"COLUNA","medico":"PAULO SERGIO SANTOS MELO","paciente":"DAMIANA MARIA DA SILVA","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"TARCISIO SOUZA DOS SANTOS","valor":97100,"portal":"OPMENEXO","pedido":5971688,"obs":"fora do prazo de liberação","id":111,"posCirurgico":""},{"data":"2026-07-29","grupo":"TRAUMA","medico":"LUIZ FELIPE ALBANEZ FALCAO","paciente":"CLAUDIANO PEREIRA DE LIMA","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"CAIO BRUNO DE MEDEIROS","valor":4876,"portal":"OPMENEXO","pedido":6063896,"obs":"fora do prazo de liberação","id":112,"posCirurgico":""},{"data":"2026-07-25","grupo":"ELETROFISIOLOGIA","medico":"JOSE NILO DE CARVALHO NETO","paciente":"DAVI LUZ SOUZA","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"SAMUEL SEABRA GUIMARAES","valor":31196.02,"portal":"OPMENEXO","pedido":5793818,"obs":"fora do prazo de liberação","id":113,"posCirurgico":""},{"data":"2026-07-27","grupo":"ELETROFISIOLOGIA","medico":"IREMAR SALVIANO DE MACEDO NETO","paciente":"MARCIO SILVEIRA DE AZEVEDO","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"SAMUEL SEABRA GUIMARAES","valor":31196.02,"portal":"OPMENEXO","pedido":5916891,"obs":"fora do prazo de liberação","id":114,"posCirurgico":""},{"data":"2026-07-28","grupo":"ELETROFISIOLOGIA","medico":"IREMAR SALVIANO DE MACEDO NETO","paciente":"VALDSON AURELIO AGUIAR","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"TARCISIO SOUZA DOS SANTOS","valor":31196.02,"portal":"OPMENEXO","pedido":5891466,"obs":"fora do prazo de liberação","id":115,"posCirurgico":""},{"data":"2026-08-05","grupo":"TRAUMA","medico":"LUIZ FELIPE ALBANEZ FALCAO","paciente":"PEDRO HENRIQUE PEREIRA SIQUEIRA","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"CAIO BRUNO DE MEDEIROS","valor":2800,"portal":"OPMENEXO","pedido":6071767,"obs":"fora do prazo de liberação","id":116,"posCirurgico":""},{"data":"2026-08-05","grupo":"TRAUMA","medico":"NAO INFORMADO","paciente":"MARIA VALDINETE DE SOUZA LIMA","hospital":"UNIMED RECIFE COOP DE TRAB MEDICO","cliente":"UNIMED RECIFE COOP DE TRAB MEDICO","plano":"UNIMED RECIFE","representante":"CAIO BRUNO DE MEDEIROS","valor":12978.92,"portal":"OPMENEXO","pedido":null,"obs":"Sem ID","id":117,"posCirurgico":""}];
+</script>
+<script>
+/* ================= CONFIG / HELPERS ================= */
+const HOJE = new Date(2026, 7, 17); // 17/08/2026 (referência)
+const BRL = v => (v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const NUM = v => (v||0).toLocaleString('pt-BR',{minimumFractionDigits:0});
+const MN  = v => v;
+const TICK = v => 'R$ '+(v/1000)+'k'; // eixo dos gráficos
+const parseDate = s => { if(!s) return null; const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); };
+const diasAtraso = s => { const d=parseDate(s); if(!d) return 0; return Math.max(0,Math.round((HOJE-d)/86400000)); };
+const initials = n => (n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+const temValor = v => v!==null && v!==undefined && String(v).trim()!=='' && String(v).toLowerCase()!=='sem id';
+
+/* normaliza texto de cabeçalho: remove acentos, espaços extras e caixa */
+const norm = s => String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
+/* converte valores numéricos vindos como número OU texto ("1.234,56") */
+function parseNum(v){
+  if(v==null||v==='') return 0;
+  if(typeof v==='number') return v;
+  let s=String(v).replace(/[^\d.,-]/g,'');
+  if(s.indexOf(',')>-1 && s.indexOf('.')>-1) s=s.replace(/\./g,'').replace(',', '.'); // 1.234,56
+  else if(s.indexOf(',')>-1) s=s.replace(',', '.');
+  const n=parseFloat(s); return isNaN(n)?0:n;
+}
+/* aliases de colunas (tolerante a variações de nome do cabeçalho) */
+const COLMAP={
+  data:['data cirurgia','data da cirurgia','data'],
+  grupo:['descricao grupo de cirurgia','descricao do grupo de cirurgia','grupo de cirurgia','grupo'],
+  medico:['nome do medico','medico'],
+  paciente:['paciente','nome do paciente'],
+  hospital:['nome do hospital','hospital'],
+  cliente:['nome do cliente faturamento','cliente faturamento','nome do cliente','cliente'],
+  plano:['nome do plano de saude','plano de saude','plano'],
+  representante:['nome do representante','representante'],
+  valor:['valor bruto','valor','valor total'],
+  posCirurgico:['pos cirurgico cliente','pós cirurgico cliente','pos-cirurgico cliente','pós-cirúrgico cliente'],
+  portal:['descricao do portal','portal'],
+  pedido:['pedido','n pedido','numero do pedido','numero pedido','no pedido'],
+  obs:['observacao','observacoes','obs']
+};
+/* transforma uma linha bruta (chaves = cabeçalhos originais) em registro padronizado */
+function mapRow(row, idx){
+  const nk={}; Object.keys(row).forEach(k=>{ nk[norm(k)]=row[k]; });
+  const get=aliases=>{ for(const a of aliases){ const v=nk[a]; if(v!==undefined && v!==null && String(v).trim()!=='') return v; } return null; };
+  return {
+    id:idx+1,
+    data:fmtDate(get(COLMAP.data)),
+    grupo:get(COLMAP.grupo), medico:get(COLMAP.medico), paciente:get(COLMAP.paciente),
+    hospital:get(COLMAP.hospital), cliente:get(COLMAP.cliente), plano:get(COLMAP.plano),
+    representante:get(COLMAP.representante), valor:parseNum(get(COLMAP.valor)),
+    posCirurgico:get(COLMAP.posCirurgico), portal:get(COLMAP.portal), pedido:get(COLMAP.pedido), obs:get(COLMAP.obs)
+  };
+}
+
+/* ================= PERSISTÊNCIA (última planilha carregada) ================= */
+const LS_KEY='pendencias_base_v2';
+function salvarBase(rows){ try{ localStorage.setItem(LS_KEY, JSON.stringify({ts:Date.now(), rows})); }catch(e){ console.warn('Falha ao gravar base:',e); } }
+function carregarBase(){ try{ const s=localStorage.getItem(LS_KEY); if(s){ const o=JSON.parse(s); if(o&&Array.isArray(o.rows)&&o.rows.length) return o; } }catch(e){} return null; }
+function limparBase(){ try{ localStorage.removeItem(LS_KEY); }catch(e){} }
+let fonteDados='modelo'; // 'modelo' | 'importado'
+
+/* ================= REGRA DE STATUS (COLUNA J) =================
+   A classificação possui APENAS 2 situações, definidas exclusivamente pela
+   coluna J "pós cirurgico cliente":
+   1) Coluna J = SIM ........................... "Pós Cirúrgicos Cotado"
+   2) Coluna J = NÃO ou vazia .................. "Pendente Pós Cirúrgicos"
+   Obs.: "Prazo Crítico" (+90 dias) NÃO é uma classificação — é apenas um
+   indicador (KPI) de atraso. Um item acima de 90 dias continua pertencendo
+   à sua classificação (Cotado ou Pendente) e apenas fica destacado em vermelho. */
+function statusOf(r){
+  const pc = norm(r.posCirurgico);
+  if(pc==='sim' || pc==='s' || pc==='yes') return 'Pós Cirúrgicos Cotado';
+  return 'Pendente Pós Cirúrgicos';
+}
+const CRIT_DIAS = 90;                       // limite do KPI de modo crítico
+const ehCritico = r => (r.atraso||0) > CRIT_DIAS;
+const STATUS_LIST = ['Pós Cirúrgicos Cotado','Pendente Pós Cirúrgicos'];
+const STATUS_META = {
+  'Pós Cirúrgicos Cotado'  :{cls:'b-cotado',  color:'#198754', icon:'fa-clipboard-check', kpiColor:'green'},
+  'Pendente Pós Cirúrgicos':{cls:'b-pendente',color:'#ffc107', icon:'fa-hourglass-half', kpiColor:'amber'}
+};
+
+/* ================= ESTADO ================= */
+let DATA = [];
+let charts = {};
+let activeKPI = null; // status selecionado ao clicar no KPI
+let activeAging = null; // faixa de atraso selecionada nos mini-KPIs: 'dentro' (0–60) | 'atencao' (61–90)
+let verTudo = false;  // ao clicar no KPI "Faturamento Pendente": exibe TODAS as linhas pendentes
+
+function prepara(rows){
+  DATA = rows.map((r,i)=>({...r, id:r.id||i+1, status:statusOf(r), atraso:diasAtraso(r.data)}));
+}
+
+/* ================= FILTROS ================= */
+function popularFiltros(){
+  const meses=[...new Set(DATA.map(r=>r.data?.slice(0,7)).filter(Boolean))].sort();
+  const planos=[...new Set(DATA.map(r=>r.plano).filter(Boolean))].sort();
+  const clientes=[...new Set(DATA.map(r=>r.cliente).filter(Boolean))].sort();
+  const grupos=[...new Set(DATA.map(r=>r.grupo).filter(Boolean))].sort();
+  const repres=[...new Set(DATA.map(r=>r.representante).filter(Boolean))].sort();
+  const mesLabel=m=>{const[y,mm]=m.split('-');return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][mm-1]+'/'+y;};
+  fill('fMes',[['','Todos os meses'],...meses.map(m=>[m,mesLabel(m)])]);
+  fill('fCliente',[['','Todos os clientes'],...clientes.map(c=>[c,c])]);
+  fill('fStatus',[['','Todos os status'],...STATUS_LIST.map(s=>[s,s])]);
+  fill('pPlano',[['','Todos os planos'],...planos.map(p=>[p,p])]);
+  fill('pCliente',[['','Todos os clientes'],...clientes.map(c=>[c,c])]);
+  fill('pGrupo',[['','Todos os grupos de cirurgia'],...grupos.map(g=>[g,g])]);
+  fill('pStatus',[['','Todos os status'],...STATUS_LIST.map(s=>[s,s])]);
+  fill('pRepres',[['','Todos os representantes'],...repres.map(r=>[r,r])]);
+}
+function fill(id,pairs){const el=document.getElementById(id);if(!el)return;el.innerHTML=pairs.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');}
+
+/* aplica filtros de topo (mês/plano/status-select) — NÃO inclui o KPI */
+function baseFiltrada(){
+  const m=fMes.value,c=fCliente.value,s=fStatus.value;
+  return DATA.filter(r=>(!m||r.data?.startsWith(m))&&(!c||r.cliente===c)&&(!s||r.status===s));
+}
+/* aplica também o filtro do KPI clicado */
+function filtrarOverview(){
+  let rows=baseFiltrada();
+  if(activeKPI==='__CRIT__') rows=rows.filter(ehCritico);        // modo crítico: só atraso > 90 dias
+  else if(activeKPI) rows=rows.filter(r=>r.status===activeKPI);  // KPI de classificação (inclui +90 dias)
+  if(activeAging==='dentro')      rows=rows.filter(r=>r.atraso>=0 && r.atraso<=60);
+  else if(activeAging==='atencao') rows=rows.filter(r=>r.atraso>=61 && r.atraso<=90);
+  return rows;
+}
+
+/* ================= KPIs (clicáveis) ================= */
+function renderKPIs(){
+  const rows=baseFiltrada(); // KPIs sempre refletem os filtros de topo (não o próprio clique)
+  const total=rows.reduce((a,r)=>a+(r.valor||0),0);
+  const grp=st=>rows.filter(r=>r.status===st);
+  const cotado=grp('Pós Cirúrgicos Cotado'), pend=grp('Pendente Pós Cirúrgicos'), crit=rows.filter(ehCritico);
+  const val=a=>a.reduce((x,r)=>x+(r.valor||0),0);
+  const cards=[
+    {key:null, c:'blue', i:'fa-sack-dollar', l:'Faturamento Pendente', v:BRL(total), s:`${MN(rows.length)} lançamentos em aberto`},
+    {key:'Pós Cirúrgicos Cotado', c:'green', i:'fa-clipboard-check', l:'Pós Cirúrgicos Cotado', v:BRL(val(cotado)), s:`${MN(cotado.length)} com coluna J = SIM`},
+    {key:'Pendente Pós Cirúrgicos', c:'amber', i:'fa-hourglass-half', l:'Pendente Pós Cirúrgicos', v:BRL(val(pend)), s:`${MN(pend.length)} com coluna J = NÃO/vazia`},
+    {key:'__CRIT__', c:'red', i:'fa-triangle-exclamation', l:'Modo Crítico (+90 dias)', v:BRL(val(crit)), s:`${MN(crit.length)} lançamentos +90 dias de atraso`},
+  ];
+  kpiRow.innerHTML=cards.map((k,idx)=>`
+    <div class="col-sm-6 col-xl-3">
+      <div class="kpi ${k.c} ${(k.key===null?verTudo:activeKPI===k.key)?'active-kpi':''}" data-kpi="${k.key===null?'__ALL__':k.key}" style="color:var(--${k.c==='blue'?'blue':k.c==='green'?'green':k.c==='amber'?'amber':'red'})">
+        <span class="flt-tag"><i class="fa-solid ${k.key===null?'fa-layer-group':'fa-arrow-pointer'}"></i></span>
+        <div class="icon"><i class="fa-solid ${k.i}"></i></div>
+        <p class="label">${k.l}</p>
+        <p class="value" style="color:#212529">${k.v}</p>
+        <div class="sub">${k.s}</div>
+      </div>
+    </div>`).join('');
+  // liga cliques
+  kpiRow.querySelectorAll('.kpi').forEach(el=>el.addEventListener('click',()=>{
+    const key=el.dataset.kpi;
+    if(key==='__ALL__'){          // KPI Faturamento Pendente: alterna a exibição de TODAS as linhas
+      verTudo=!verTudo; activeKPI=null;
+    }else{                        // KPI de status: filtra por aquele status
+      activeKPI=(activeKPI===key)?null:key; verTudo=false;
+    }
+    activeAging=null; // clique no KPI de status limpa o recorte por faixa de atraso
+    fStatus.value=''; // clique no KPI assume o controle do filtro de status
+    aplicarFiltroVisual();
+  }));
+}
+
+/* ================= GRÁFICOS ================= */
+function destroy(k){ if(charts[k]){charts[k].destroy(); delete charts[k];} }
+function renderCharts(rows){
+  const mesLabel=m=>{const[y,mm]=m.split('-');return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][mm-1]+'/'+y.slice(2);};
+  const meses=[...new Set(rows.map(r=>r.data?.slice(0,7)).filter(Boolean))].sort();
+  const porMes=meses.map(m=>rows.filter(r=>r.data?.startsWith(m)).reduce((a,r)=>a+(r.valor||0),0));
+  destroy('line');
+  const ctxL=document.getElementById('chartLine').getContext('2d');
+  const grad=ctxL.createLinearGradient(0,0,0,300);
+  grad.addColorStop(0,'rgba(13,110,253,.28)');grad.addColorStop(1,'rgba(13,110,253,0)');
+  charts.line=new Chart(ctxL,{type:'line',data:{labels:meses.map(mesLabel),datasets:[{
+    label:'Valor Pendente',data:porMes,borderColor:'#0d6efd',backgroundColor:grad,fill:true,
+    tension:.38,borderWidth:3,pointRadius:4,pointBackgroundColor:'#0d6efd',pointHoverRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>' '+BRL(c.raw)}}},
+      scales:{y:{ticks:{callback:TICK},grid:{color:'#f1f3f5'}},x:{grid:{display:false}}}}});
+
+  const stVals=STATUS_LIST.map(s=>rows.filter(r=>r.status===s).reduce((a,r)=>a+(r.valor||0),0));
+  const stTotal=stVals.reduce((a,b)=>a+b,0);
+  destroy('donut');
+  charts.donut=new Chart(document.getElementById('chartDonut'),{type:'doughnut',
+    data:{labels:STATUS_LIST,datasets:[{data:stVals,backgroundColor:STATUS_LIST.map(s=>STATUS_META[s].color),borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',layout:{padding:6},
+      onClick:(e,el)=>{ if(el.length){ const s=STATUS_LIST[el[0].index]; activeKPI=(activeKPI===s?null:s); activeAging=null; fStatus.value=''; aplicarFiltroVisual(); } },
+      plugins:{legend:{position:'bottom',labels:{usePointStyle:true,padding:12,font:{size:11},
+        generateLabels:ch=>{const d=ch.data;return d.labels.map((l,i)=>{const val=d.datasets[0].data[i];const pct=stTotal?(val/stTotal*100):0;return{text:`${l} · ${pct.toFixed(1)}%`,fillStyle:d.datasets[0].backgroundColor[i],strokeStyle:d.datasets[0].backgroundColor[i],pointStyle:'circle',index:i};});}}},
+      tooltip:{callbacks:{label:c=>{const pct=stTotal?(c.raw/stTotal*100):0;return ` ${c.label}: ${BRL(c.raw)} (${pct.toFixed(1)}%)`;}}}}},
+    plugins:[{
+      id:'donutPercent',
+      afterDatasetsDraw(chart){
+        const {ctx}=chart; const meta=chart.getDatasetMeta(0);
+        ctx.save();
+        ctx.font='700 12px "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        meta.data.forEach((arc,i)=>{
+          const val=stVals[i]; if(!val||!stTotal) return;
+          const pct=val/stTotal*100; if(pct<4) return; // oculta rótulo em fatias muito pequenas
+          const p=arc.tooltipPosition();
+          ctx.fillStyle='#fff';
+          ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=3;
+          ctx.fillText(pct.toFixed(1)+'%', p.x, p.y);
+          ctx.shadowBlur=0;
+        });
+        // total no centro
+        const cx=(chart.chartArea.left+chart.chartArea.right)/2;
+        const cy=(chart.chartArea.top+chart.chartArea.bottom)/2;
+        ctx.fillStyle='#6c757d'; ctx.font='600 10px "Segoe UI", Roboto, sans-serif';
+        ctx.fillText('TOTAL', cx, cy-9);
+        ctx.fillStyle='#212529'; ctx.font='700 13px "Segoe UI", Roboto, sans-serif';
+        ctx.fillText(BRL(stTotal).replace('R$\u00a0','R$ '), cx, cy+8);
+        ctx.restore();
+      }
+    }]});
+}
+
+function renderAnalises(rows){
+  const agg=(key)=>{const m={};rows.forEach(r=>{const k=r[key]||'—';m[k]=(m[k]||0)+(r.valor||0)});return m;};
+  const grandTotal=rows.reduce((a,r)=>a+(r.valor||0),0);
+
+  const cli=Object.entries(agg('cliente')).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  destroy('cli');
+  charts.cli=new Chart(document.getElementById('chartClientes'),{type:'bar',
+    data:{labels:cli.map(c=>c[0].length>26?c[0].slice(0,26)+'…':c[0]),datasets:[{data:cli.map(c=>c[1]),backgroundColor:'#0d6efd',borderRadius:6}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:52}},plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>{const pct=grandTotal?(c.raw/grandTotal*100):0;return ` ${BRL(c.raw)} (${pct.toFixed(1)}% da carteira)`;}}}},scales:{x:{ticks:{callback:TICK},grid:{color:'#f1f3f5'}},y:{grid:{display:false}}}},
+    plugins:[{ id:'cliPct', afterDatasetsDraw(chart){
+      const {ctx}=chart, meta=chart.getDatasetMeta(0);
+      ctx.save(); ctx.font='700 11px "Segoe UI",Roboto,sans-serif'; ctx.textBaseline='middle'; ctx.textAlign='left'; ctx.fillStyle='#0d6efd';
+      meta.data.forEach((bar,i)=>{ if(!grandTotal) return; const pct=cli[i][1]/grandTotal*100; ctx.fillText(pct.toFixed(1)+'%', bar.x+6, bar.y); });
+      ctx.restore();
+    }}]});
+
+  const faixas=[['0–30 dias',0,30],['31–60 dias',31,60],['61–90 dias',61,90],['+90 dias',91,99999]];
+  const agVal=faixas.map(f=>rows.filter(r=>r.atraso>=f[1]&&r.atraso<=f[2]).reduce((a,r)=>a+(r.valor||0),0));
+  const agCnt=faixas.map(f=>rows.filter(r=>r.atraso>=f[1]&&r.atraso<=f[2]).length);
+  destroy('aging');
+  charts.aging=new Chart(document.getElementById('chartAging'),{type:'bar',
+    data:{labels:faixas.map(f=>f[0]),datasets:[{label:'Valor',data:agVal,backgroundColor:['#198754','#ffc107','#fd7e14','#dc3545'],borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>{const pct=grandTotal?(c.raw/grandTotal*100):0;return ` ${BRL(c.raw)} · ${MN(agCnt[c.dataIndex])} pend. (${pct.toFixed(1)}%)`;}}}},
+      scales:{y:{ticks:{callback:TICK},grid:{color:'#f1f3f5'}},x:{grid:{display:false}}}},
+    plugins:[{ id:'agPct', afterDatasetsDraw(chart){
+      const {ctx}=chart, meta=chart.getDatasetMeta(0);
+      ctx.save(); ctx.font='700 11px "Segoe UI",Roboto,sans-serif'; ctx.textBaseline='bottom'; ctx.textAlign='center'; ctx.fillStyle='#495057';
+      meta.data.forEach((bar,i)=>{ if(!grandTotal) return; const pct=agVal[i]/grandTotal*100; ctx.fillText(pct.toFixed(1)+'%', bar.x, bar.y-4); });
+      ctx.restore();
+    }}]});
+
+  const gr=Object.entries(agg('grupo')).sort((a,b)=>b[1]-a[1]);
+  const palette=['#0d6efd','#198754','#ffc107','#dc3545','#6610f2','#20c997','#fd7e14','#6f42c1','#0dcaf0'];
+  destroy('grupo');
+  charts.grupo=new Chart(document.getElementById('chartGrupo'),{type:'pie',
+    data:{labels:gr.map(g=>g[0]),datasets:[{data:gr.map(g=>g[1]),backgroundColor:palette,borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{usePointStyle:true,font:{size:11}}},
+      tooltip:{callbacks:{label:c=>' '+c.label+': '+BRL(c.raw)}}}}});
+
+  const rp=Object.entries(agg('representante')).sort((a,b)=>b[1]-a[1]);
+  const rpTotal=rp.reduce((a,b)=>a+b[1],0);
+  destroy('repres');
+  charts.repres=new Chart(document.getElementById('chartRepres'),{type:'bar',
+    data:{labels:rp.map(r=>r[0].split(' ').slice(0,2).join(' ')),datasets:[{data:rp.map(r=>r[1]),backgroundColor:'#198754',borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>{const pct=rpTotal?(c.raw/rpTotal*100):0;return ` ${BRL(c.raw)} (${pct.toFixed(1)}% da carteira)`;}}}},scales:{y:{ticks:{callback:TICK},grid:{color:'#f1f3f5'}},x:{grid:{display:false}}}},
+    plugins:[{ id:'repPct', afterDatasetsDraw(chart){
+      const {ctx}=chart, meta=chart.getDatasetMeta(0);
+      ctx.save(); ctx.font='700 11px "Segoe UI",Roboto,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillStyle='#198754';
+      meta.data.forEach((bar,i)=>{ if(!rpTotal) return; const pct=rp[i][1]/rpTotal*100; ctx.fillText(pct.toFixed(1)+'%', bar.x, bar.y-4); });
+      ctx.restore();
+    }}]});
+
+  /* ===== Ticket médio por especialidade = valor total ÷ nº de cirurgias; % = participação no valor total ===== */
+  const gstat={}; rows.forEach(r=>{const k=r.grupo||'—'; (gstat[k]||(gstat[k]={tot:0,n:0})); gstat[k].tot+=(r.valor||0); gstat[k].n++;});
+  const tk=Object.entries(gstat).map(([k,v])=>({esp:k, ticket:v.n?v.tot/v.n:0, n:v.n, tot:v.tot})).sort((a,b)=>b.ticket-a.ticket);
+  destroy('ticket');
+  charts.ticket=new Chart(document.getElementById('chartTicket'),{type:'bar',
+    data:{labels:tk.map(t=>t.esp),datasets:[{label:'Ticket médio',data:tk.map(t=>t.ticket),backgroundColor:'#6610f2',borderRadius:6}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:96}},plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>` Ticket médio: ${BRL(c.raw)}`,afterLabel:c=>{const t=tk[c.dataIndex];return `Nº cirurgias: ${MN(t.n)} · Total: ${BRL(t.tot)}`;}}}},
+      scales:{x:{ticks:{callback:TICK},grid:{color:'#f1f3f5'}},y:{grid:{display:false}}}},
+    plugins:[{ id:'tkLbl', afterDatasetsDraw(chart){
+      const {ctx}=chart, meta=chart.getDatasetMeta(0);
+      ctx.save(); ctx.font='700 11px "Segoe UI",Roboto,sans-serif'; ctx.textBaseline='middle'; ctx.textAlign='left'; ctx.fillStyle='#6610f2';
+      meta.data.forEach((bar,i)=>{ const t=tk[i]; ctx.fillText(`${BRL(t.ticket)}`, bar.x+6, bar.y); });
+      ctx.restore();
+    }}]});
+}
+
+/* ================= TABELAS ================= */
+function badge(s){const m=STATUS_META[s];return `<span class="badge-status ${m.cls}"><i class="fa-solid ${m.icon} me-1"></i>${s}</span>`;}
+function agingCell(d){let c='#198754';if(d>90)c='#dc3545';else if(d>60)c='#fd7e14';else if(d>30)c='#997404';
+  return `<span style="color:${c};font-weight:600">${d} d</span>`;}
+
+function renderTabelaRecent(rows){
+  const sorted=[...rows].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  // Ao clicar num KPI/faixa exibe TODOS os registros do recorte (inclusive os +90 dias, mais antigos);
+  // sem recorte ativo, mostra apenas os 15 mais recentes.
+  const t = (verTudo || activeKPI || activeAging) ? sorted : sorted.slice(0,15);
+  document.querySelector('#tblRecent tbody').innerHTML=t.map(r=>`
+    <tr class="${ehCritico(r)?'row-critico':''}">
+      <td class="text-muted">#${String(r.id).padStart(3,'0')}</td>
+      <td><div class="d-flex align-items-center"><span class="avatar-mini">${initials(r.cliente)}</span>
+        <div><div style="font-weight:600">${r.cliente||'—'}</div><small class="text-muted">${r.plano||''}</small></div></div></td>
+      <td>${r.paciente||'—'}</td>
+      <td>${r.data?r.data.split('-').reverse().join('/'):'—'}</td>
+      <td>${agingCell(r.atraso)}</td>
+      <td class="text-end" style="font-weight:600">${BRL(r.valor)}</td>
+      <td>${badge(r.status)}${ehCritico(r)?'<span class="tag-critico">+90 dias</span>':''}</td>
+    </tr>`).join('')||`<tr><td colspan="7" class="text-center text-muted py-4">Nenhum registro para o filtro selecionado.</td></tr>`;
+}
+
+function renderTabelaFull(){
+  const q=(pSearch.value||'').toLowerCase(),p=pPlano.value,s=pStatus.value,rp=pRepres.value,cl=pCliente.value,g=pGrupo.value;
+  const rows=DATA.filter(r=>{
+    const hay=`${r.cliente} ${r.paciente} ${r.plano} ${r.hospital} ${r.medico} ${r.representante}`.toLowerCase();
+    return (!q||hay.includes(q))&&(!p||r.plano===p)&&(!s||r.status===s)&&(!rp||r.representante===rp)&&(!cl||r.cliente===cl)&&(!g||r.grupo===g);
+  }).sort((a,b)=>b.valor-a.valor);
+  pCount.textContent=`${MN(rows.length)} registros · ${BRL(rows.reduce((a,r)=>a+r.valor,0))}`;
+  document.querySelector('#tblFull tbody').innerHTML=rows.map(r=>`
+    <tr class="${ehCritico(r)?'row-critico':''}">
+      <td class="text-muted">#${String(r.id).padStart(3,'0')}</td>
+      <td>${r.data?r.data.split('-').reverse().join('/'):'—'}</td>
+      <td style="font-weight:600">${r.cliente||'—'}</td>
+      <td>${r.plano||'—'}</td>
+      <td>${r.paciente||'—'}</td>
+      <td><small>${r.hospital||'—'}</small></td>
+      <td><small>${r.grupo||'—'}</small></td>
+      <td><small>${r.portal||'<span class="text-danger">—</span>'}</small></td>
+      <td><small>${temValor(r.pedido)?r.pedido:'<span class="text-danger">—</span>'}</small></td>
+      <td class="text-end" style="font-weight:600">${BRL(r.valor)}</td>
+      <td>${agingCell(r.atraso)}</td>
+      <td>${badge(r.status)}${ehCritico(r)?'<span class="tag-critico">+90 dias</span>':''}</td>
+    </tr>`).join('')||`<tr><td colspan="12" class="text-center text-muted py-4">Nenhum registro.</td></tr>`;
+}
+
+/* ================= BARRA DE FILTRO ATIVO ================= */
+function atualizarBarraFiltro(){
+  if(activeAging){
+    filterBar.classList.add('show');
+    const n=filtrarOverview().length;
+    const rot=activeAging==='dentro'?'Dentro do Prazo (0–60 dias)':'Em Atenção (61–90 dias)';
+    const cor=activeAging==='dentro'?'var(--green)':'#b98900';
+    filterBarText.innerHTML=`Exibindo apenas <b>${rot}</b> — ${MN(n)} registro(s). Os gráficos e a tabela abaixo estão filtrados por faixa de atraso.`;
+    recentScope.innerHTML=`· <span style="color:${cor}">${rot}</span>`;
+  }else if(activeKPI){
+    filterBar.classList.add('show');
+    const n=filtrarOverview().length;
+    const isCrit=activeKPI==='__CRIT__';
+    const rot=isCrit?'Modo Crítico (+90 dias)':activeKPI;
+    const cor=isCrit?'#dc3545':STATUS_META[activeKPI].color;
+    const compl=(!isCrit)?' Os itens com <b style="color:#dc3545">+90 dias de atraso</b> aparecem destacados em vermelho.':'';
+    filterBarText.innerHTML=`Exibindo apenas <b>${rot}</b> — ${MN(n)} registro(s). Os gráficos e a tabela abaixo estão filtrados.${compl}`;
+    recentScope.innerHTML=`· <span style="color:${cor}">${rot}</span>`;
+  }else if(verTudo){
+    filterBar.classList.add('show');
+    const n=filtrarOverview().length;
+    filterBarText.innerHTML=`Exibindo <b>todas</b> as ${MN(n)} linhas pendentes. Clique novamente no card <b>Faturamento Pendente</b> para recolher.`;
+    recentScope.innerHTML=`· <span style="color:var(--blue)">Todas as pendências (${n})</span>`;
+  }else{
+    filterBar.classList.remove('show');
+    recentScope.innerHTML='';
+  }
+}
+
+/* ================= RENDER GERAL ================= */
+function aplicarFiltroVisual(){
+  renderKPIs();
+  const rows=filtrarOverview();
+  renderCharts(rows);
+  renderMini(rows);
+  renderMiniPaineis(rows);
+  renderInsights(rows);
+  renderTabelaRecent(rows);
+  atualizarBarraFiltro();
+}
+
+/* ================= FAIXA DE MINI-INDICADORES ================= */
+function renderMini(rows){
+  const base=baseFiltrada(); // universo (sem o próprio recorte) para as faixas de atraso clicáveis
+  const total=rows.reduce((a,r)=>a+(r.valor||0),0);
+  const qtd=rows.length;
+  const ticket=qtd?total/qtd:0;
+  const dentro=base.filter(r=>r.atraso>=0 && r.atraso<=60);         // dentro do prazo (0–60 dias)
+  const valDentro=dentro.reduce((a,r)=>a+(r.valor||0),0);
+  const atencao=base.filter(r=>r.atraso>=61 && r.atraso<=90);       // prestes a virar crítico
+  const valAtencao=atencao.reduce((a,r)=>a+(r.valor||0),0);
+  const clientes=new Set(rows.map(r=>r.cliente).filter(Boolean)).size;
+  const planos=new Set(rows.map(r=>r.plano).filter(Boolean)).size;
+  const atrasoMedio=qtd?Math.round(rows.reduce((a,r)=>a+r.atraso,0)/qtd):0;
+  const cards=[
+    {c:'blue', i:'fa-receipt', l:'Ticket Médio', v:BRL(ticket), s:`base de ${MN(qtd)} pendências`, key:null},
+    {c:'green',i:'fa-circle-check', l:'Dentro do Prazo', v:BRL(valDentro), s:`${MN(dentro.length)} títulos de 0–60 dias`, key:'dentro'},
+    {c:'amber',i:'fa-bell', l:'Em Atenção (61–90d)', v:BRL(valAtencao), s:`${MN(atencao.length)} prestes a vencer`, key:'atencao'},
+    {c:'blue', i:'fa-users', l:'Clientes Distintos', v:MN(clientes), s:`${MN(planos)} planos de saúde`, key:null},
+    {c:'red',  i:'fa-clock-rotate-left', l:'Atraso Médio', v:`${MN(atrasoMedio)} dias`, s:'média da carteira', key:null},
+  ];
+  const mp={blue:'var(--blue)',green:'var(--green)',amber:'#b98900',red:'var(--red)'};
+  const bg={blue:'rgba(13,110,253,.12)',green:'rgba(25,135,84,.12)',amber:'rgba(255,193,7,.15)',red:'rgba(220,53,69,.12)'};
+  miniRow.innerHTML=cards.map(k=>`
+    <div class="col-6 col-md-4 col-xl">
+      <div class="mini ${k.key?'mini-click':''} ${(k.key&&activeAging===k.key)?'mini-active':''}" ${k.key?`data-mini="${k.key}"`:''}>
+        <div class="mi-icon" style="background:${bg[k.c]};color:${mp[k.c]}"><i class="fa-solid ${k.i}"></i></div>
+        <div>
+          <p class="mi-label">${k.l}${k.key?' <i class="fa-solid fa-arrow-pointer mi-flt"></i>':''}</p>
+          <p class="mi-value">${k.v}</p>
+          <div class="mi-sub">${k.s}</div>
+        </div>
+      </div>
+    </div>`).join('');
+  // liga cliques nas faixas de atraso (Dentro do Prazo / Em Atenção)
+  miniRow.querySelectorAll('.mini-click').forEach(el=>el.addEventListener('click',()=>{
+    const key=el.dataset.mini;
+    activeAging=(activeAging===key)?null:key; // alterna
+    activeKPI=null; verTudo=false; fStatus.value='';
+    aplicarFiltroVisual();
+  }));
+}
+
+/* ================= MINI-PAINÉIS (Top5 + Aging) ================= */
+function renderMiniPaineis(rows){
+  const agg={}; rows.forEach(r=>{const k=r.cliente||'—'; agg[k]=(agg[k]||0)+(r.valor||0);});
+  const top5=Object.entries(agg).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  destroy('top5');
+  charts.top5=new Chart(document.getElementById('chartTop5'),{type:'bar',
+    data:{labels:top5.map(c=>c[0].length>24?c[0].slice(0,24)+'…':c[0]),datasets:[{data:top5.map(c=>c[1]),backgroundColor:'#0d6efd',borderRadius:6}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>' '+BRL(c.raw)}}},scales:{x:{ticks:{callback:TICK},grid:{color:'#f1f3f5'}},y:{grid:{display:false}}}}});
+
+  const faixas=[['0–30',0,30],['31–60',31,60],['61–90',61,90],['+90',91,99999]];
+  const agVal=faixas.map(f=>rows.filter(r=>r.atraso>=f[1]&&r.atraso<=f[2]).reduce((a,r)=>a+(r.valor||0),0));
+  const agCnt=faixas.map(f=>rows.filter(r=>r.atraso>=f[1]&&r.atraso<=f[2]).length);
+  destroy('agingMini');
+  charts.agingMini=new Chart(document.getElementById('chartAgingMini'),{type:'bar',
+    data:{labels:faixas.map(f=>f[0]),datasets:[{data:agVal,backgroundColor:['#198754','#ffc107','#fd7e14','#dc3545'],borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>` ${BRL(c.raw)} · ${MN(agCnt[c.dataIndex])} pend.`}}},
+      scales:{y:{ticks:{callback:TICK},grid:{color:'#f1f3f5'}},x:{grid:{display:false}}}}});
+}
+
+/* ================= INSIGHTS AUTOMÁTICOS ================= */
+function renderInsights(rows){
+  const total=rows.reduce((a,r)=>a+(r.valor||0),0);
+  const aggBy=key=>{const m={};rows.forEach(r=>{const k=r[key]||'—';m[k]=(m[k]||0)+(r.valor||0);});return Object.entries(m).sort((a,b)=>b[1]-a[1]);};
+  const cliTop=aggBy('cliente')[0];
+  const planTop=aggBy('plano')[0];
+  const repTop=aggBy('representante')[0];
+  const crit=rows.filter(ehCritico);
+  const valCrit=crit.reduce((a,r)=>a+(r.valor||0),0);
+  const pctCrit=total?(valCrit/total*100):0;
+  const maiorAtraso=rows.reduce((m,r)=>r.atraso>(m?.atraso||-1)?r:m,null);
+  const items=[];
+  if(cliTop) items.push({i:'fa-crown',c:'#b98900',t:`Maior cliente: <b>${cliTop[0]}</b> com ${BRL(cliTop[1])} (${total?(cliTop[1]/total*100).toFixed(0):0}% do total).`});
+  if(crit.length) items.push({i:'fa-triangle-exclamation',c:'#dc3545',t:`<b>${MN(crit.length)}</b> lançamentos em prazo crítico (+90 dias) somam ${BRL(valCrit)} (${pctCrit.toFixed(0)}% da carteira).`});
+  if(planTop) items.push({i:'fa-hospital',c:'#0d6efd',t:`Plano com maior volume: <b>${planTop[0]}</b> (${BRL(planTop[1])}).`});
+  if(repTop) items.push({i:'fa-user-tie',c:'#198754',t:`Representante com maior carteira: <b>${repTop[0].split(' ').slice(0,2).join(' ')}</b> (${BRL(repTop[1])}).`});
+  if(maiorAtraso) items.push({i:'fa-hourglass-end',c:'#fd7e14',t:`Título mais antigo: <b>${MN(maiorAtraso.atraso)} dias</b> de atraso — ${(maiorAtraso.cliente||'—').slice(0,22)}.`});
+  insightsBox.innerHTML = items.length
+    ? items.map(x=>`<div class="insight"><i class="fa-solid ${x.i}" style="color:${x.c}"></i><span>${x.t}</span></div>`).join('')
+    : '<div class="text-muted small py-3">Sem dados para o filtro selecionado.</div>';
+}
+function renderOverview(){ activeKPI=null; activeAging=null; verTudo=false; aplicarFiltroVisual(); }
+/* re-renderiza tudo preservando filtros ativos */
+function refreshAll(){ aplicarFiltroVisual(); renderTabelaFull(); renderAnalises(DATA); }
+function renderTudo(){
+  popularFiltros(); renderOverview(); renderTabelaFull(); renderAnalises(DATA);
+  lastUpdate.textContent=new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+/* ================= NAVEGAÇÃO ================= */
+const SUB={overview:'',
+  pendencias:'Lista detalhada de todos os títulos pendentes',
+  analises:'Indicadores analíticos e aging da carteira',
+  importar:'Carregue uma nova base de pendências'};
+const TIT={overview:'',pendencias:'Pendências',analises:'Análises',importar:'Importar Dados'};
+function goto(page){
+  document.querySelectorAll('.nav-link[data-page]').forEach(a=>a.classList.toggle('active',a.dataset.page===page));
+  document.querySelectorAll('.page').forEach(s=>s.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  pageTitle.textContent=TIT[page]; pageTitle.style.display=TIT[page]?'block':'none';
+  pageSubtitle.textContent=SUB[page]; pageSubtitle.style.display=SUB[page]?'block':'none';
+  closeSidebar();
+}
+document.querySelectorAll('.nav-link[data-page]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();goto(a.dataset.page);}));
+
+/* ================= SIDEBAR MOBILE ================= */
+function openSidebar(){sidebar.classList.add('show');overlay.classList.add('show');}
+function closeSidebar(){sidebar.classList.remove('show');overlay.classList.remove('show');}
+hamburger.addEventListener('click',openSidebar);
+overlay.addEventListener('click',closeSidebar);
+
+/* ================= LISTENERS FILTROS ================= */
+['fMes','fCliente','fStatus'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{activeKPI=null;activeAging=null;verTudo=false;aplicarFiltroVisual();}));
+fLimpar.addEventListener('click',()=>{fMes.value='';fCliente.value='';fStatus.value='';activeKPI=null;activeAging=null;verTudo=false;aplicarFiltroVisual();});
+filterBarClear.addEventListener('click',()=>{activeKPI=null;activeAging=null;verTudo=false;aplicarFiltroVisual();});
+quickSearch.addEventListener('input',()=>{
+  const q=quickSearch.value.toLowerCase();
+  const rows=filtrarOverview().filter(r=>`${r.cliente} ${r.paciente} ${r.plano}`.toLowerCase().includes(q));
+  renderTabelaRecent(rows);
+});
+['pSearch','pPlano','pStatus','pRepres','pCliente','pGrupo'].forEach(id=>document.getElementById(id).addEventListener('input',renderTabelaFull));
+
+/* ================= EXPORTAR / IMPRIMIR ================= */
+btnExport.addEventListener('click',e=>{e.preventDefault();
+  const exp=DATA.map(r=>({Data:r.data,Grupo:r.grupo,Medico:r.medico,Paciente:r.paciente,Hospital:r.hospital,
+    Cliente:r.cliente,Plano:r.plano,Representante:r.representante,'Valor Bruto':r.valor,Portal:r.portal,
+    Pedido:r.pedido,'Atraso (dias)':r.atraso,Status:r.status,Observacao:r.obs}));
+  const ws=XLSX.utils.json_to_sheet(exp);const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Pendencias');
+  XLSX.writeFile(wb,'Pendencias_Faturamento_export.xlsx');
+});
+btnPrint.addEventListener('click',e=>{e.preventDefault();window.print();});
+
+/* ================= IMPORTAR EXCEL ================= */
+fileInput.addEventListener('change',ev=>{
+  const file=ev.target.files[0];if(!file)return;
+  importMsg.innerHTML='<div class="text-muted small"><i class="fa-solid fa-spinner fa-spin"></i> Lendo arquivo...</div>';
+  const reader=new FileReader();
+  reader.onerror=()=>{importMsg.innerHTML='<div class="alert alert-danger py-2">Não foi possível ler o arquivo.</div>';};
+  reader.onload=e=>{
+    try{
+      if(typeof XLSX==='undefined'){importMsg.innerHTML='<div class="alert alert-danger py-2">Biblioteca de leitura (SheetJS) não carregou. Verifique a conexão e recarregue a página.</div>';return;}
+      /* usa Uint8Array (evita parse vazio quando um ArrayBuffer é passado direto) */
+      const bytes=new Uint8Array(e.target.result);
+      const wb=XLSX.read(bytes,{type:'array',cellDates:true});
+      if(!wb.SheetNames.length){importMsg.innerHTML='<div class="alert alert-warning py-2">Planilha vazia.</div>';return;}
+      /* detecção robusta da aba de dados: prioriza a que contém "pend", ignora RESUMO */
+      let sName = wb.SheetNames.find(n=>norm(n).includes('pend'))
+               || wb.SheetNames.find(n=>norm(n)!=='resumo')
+               || wb.SheetNames[0];
+      const sheet=wb.Sheets[sName];
+      const json=XLSX.utils.sheet_to_json(sheet,{defval:null,raw:true});
+      if(!json.length){importMsg.innerHTML='<div class="alert alert-warning py-2">A aba "'+sName+'" não tem linhas de dados.</div>';return;}
+      const map=json.map(mapRow).filter(r=>r.cliente||r.paciente);
+      if(!map.length){
+        const cols=Object.keys(json[0]||{}).join(', ');
+        importMsg.innerHTML='<div class="alert alert-warning py-2">Nenhuma linha válida encontrada na aba "'+sName+'".<br><small>Colunas lidas: '+cols+'</small></div>';
+        return;
+      }
+      prepara(map);
+      salvarBase(map);                 // <<< grava a última planilha carregada
+      fonteDados='importado';
+      renderTudo();
+      atualizarFonteBadge();
+      importMsg.innerHTML=`<div class="alert alert-success py-2"><i class="fa-solid fa-check"></i> ${map.length} pendências importadas e salvas com sucesso! <small>(aba "${sName}")</small></div>`;
+      setTimeout(()=>goto('overview'),900);
+    }catch(err){importMsg.innerHTML='<div class="alert alert-danger py-2">Erro ao ler o arquivo: '+err.message+'</div>';}
+  };
+  reader.readAsArrayBuffer(file);
+});
+/* converte data de qualquer origem para YYYY-MM-DD (usa partes LOCAIS, sem shift de fuso) */
+function fmtDate(v){
+  if(v==null||v==='')return null;
+  if(v instanceof Date){const y=v.getFullYear(),m=v.getMonth()+1,d=v.getDate();return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
+  if(typeof v==='number'){const dt=new Date(Math.round((v-25569)*86400000));return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;}
+  const s=String(v).trim();
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m=s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){let[_,a,b,y]=m;if(y.length===2)y='20'+y;
+    /* assume MM/DD/AAAA (padrão do arquivo-modelo); se dia>12 no 1º campo, inverte */
+    let mo=a,d=b; if(Number(a)>12 && Number(b)<=12){mo=b;d=a;}
+    return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
+  return s.slice(0,10);
+}
+/* botão limpar/restaurar base do modelo */
+function restaurarModelo(){
+  limparBase(); fonteDados='modelo';
+  prepara(RAW_DATA); renderTudo(); atualizarFonteBadge();
+  importMsg.innerHTML='<div class="alert alert-info py-2"><i class="fa-solid fa-rotate-left"></i> Base restaurada para os dados do modelo.</div>';
+}
+/* badge indicando a fonte dos dados na aba Importar */
+function atualizarFonteBadge(){
+  const el=document.getElementById('fonteBadge'); if(!el)return;
+  const saved=carregarBase();
+  if(fonteDados==='importado' && saved){
+    const dt=new Date(saved.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    el.innerHTML=`<span class="badge bg-success"><i class="fa-solid fa-database"></i> Exibindo última planilha importada · ${saved.rows.length} registros · ${dt}</span>
+      <button class="btn btn-sm btn-outline-secondary ms-2" onclick="restaurarModelo()"><i class="fa-solid fa-rotate-left"></i> Restaurar dados do modelo</button>`;
+  }else{
+    el.innerHTML=`<span class="badge bg-secondary"><i class="fa-solid fa-file-lines"></i> Exibindo dados do modelo (nenhuma importação salva)</span>`;
+  }
+}
+
+/* ================= LOGIN ================= */
+const AUTH_USER='Vertical';
+const AUTH_PASS='vertical';
+function fazerLogin(){
+  const u=(loginUser.value||'').trim();
+  const p=(loginPass.value||'');
+  if(u.toLowerCase()===AUTH_USER.toLowerCase() && p===AUTH_PASS){
+    try{ sessionStorage.setItem('dash_auth','1'); }catch(e){}
+    loginError.style.display='none';
+    loginScreen.style.opacity='0';
+    setTimeout(()=>{ loginScreen.style.display='none'; }, 300);
+  }else{
+    loginError.style.display='block';
+    loginPass.value='';
+    loginPass.focus();
+  }
+}
+function sairLogin(){
+  try{ sessionStorage.removeItem('dash_auth'); }catch(e){}
+  location.reload();
+}
+loginBtn.addEventListener('click',fazerLogin);
+[loginUser,loginPass].forEach(el=>el.addEventListener('keydown',e=>{ if(e.key==='Enter') fazerLogin(); }));
+btnLogout.addEventListener('click',e=>{ e.preventDefault(); sairLogin(); });
+
+/* ================= INIT ================= */
+(function init(){
+  // sessão já autenticada?
+  let ok=false; try{ ok=sessionStorage.getItem('dash_auth')==='1'; }catch(e){}
+  if(ok){ loginScreen.style.display='none'; } else { loginUser.focus(); }
+  // dados
+  const saved=carregarBase();
+  if(saved){ fonteDados='importado'; prepara(saved.rows); }
+  else { fonteDados='modelo'; prepara(RAW_DATA); }
+  renderTudo();
+  atualizarFonteBadge();
+
+})();
+</script>
+</body>
+</html>
