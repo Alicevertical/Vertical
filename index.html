@@ -395,13 +395,13 @@ const RAW_DATA = [{"id":1,"data":"2026-06-30","grupo":"TRAUMA","medico":null,"pa
 </script>
 <script>
 /* ================= CONFIG / HELPERS ================= */
-const HOJE = new Date(2026, 7, 17); // 17/08/2026 (referência)
+const HOJE = new Date(); HOJE.setHours(0,0,0,0); // data atual do sistema
 const BRL = v => (v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const NUM = v => (v||0).toLocaleString('pt-BR',{minimumFractionDigits:0});
 const MN  = v => v;
 const TICK = v => 'R$ '+(v/1000)+'k'; // eixo dos gráficos
 const parseDate = s => { if(!s) return null; const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); };
-const diasAtraso = s => { const d=parseDate(s); if(!d) return 0; return Math.max(0,Math.round((HOJE-d)/86400000)); };
+const diasAtraso = s => { const d=parseDate(s); if(!d) return 0; const hojeUTC=Date.UTC(HOJE.getFullYear(),HOJE.getMonth(),HOJE.getDate()); const dataUTC=Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()); return Math.max(0,Math.floor((hojeUTC-dataUTC)/86400000)); };
 const initials = n => (n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 const temValor = v => v!==null && v!==undefined && String(v).trim()!=='' && String(v).toLowerCase()!=='sem id';
 
@@ -456,22 +456,22 @@ let fonteDados='modelo'; // 'modelo' | 'importado'
 /* ================= REGRA DE STATUS (COLUNA J) =================
    A classificação possui APENAS 2 situações, definidas exclusivamente pela
    coluna J "pós cirurgico cliente":
-   1) Coluna J = SIM ........................... "Pós Cirúrgicos Cotado"
-   2) Coluna J = NÃO ou vazia .................. "Pendente Pós Cirúrgicos"
+   1) Coluna J = SIM ........................... "Esteira de Faturamento"
+   2) Coluna J = NÃO ou vazia .................. "Pós Cirúrgico em Tratativa"
    Obs.: "Prazo Crítico" (+90 dias) NÃO é uma classificação — é apenas um
    indicador (KPI) de atraso. Um item acima de 90 dias continua pertencendo
    à sua classificação (Cotado ou Pendente) e apenas fica destacado em vermelho. */
 function statusOf(r){
   const pc = norm(r.posCirurgico);
-  if(pc==='sim' || pc==='s' || pc==='yes') return 'Pós Cirúrgicos Cotado';
-  return 'Pendente Pós Cirúrgicos';
+  if(pc==='sim' || pc==='s' || pc==='yes') return 'Esteira de Faturamento';
+  return 'Pós Cirúrgico em Tratativa';
 }
 const CRIT_DIAS = 90;                       // limite do KPI de modo crítico
 const ehCritico = r => (r.atraso||0) > CRIT_DIAS;
-const STATUS_LIST = ['Pós Cirúrgicos Cotado','Pendente Pós Cirúrgicos'];
+const STATUS_LIST = ['Esteira de Faturamento','Pós Cirúrgico em Tratativa'];
 const STATUS_META = {
-  'Pós Cirúrgicos Cotado'  :{cls:'b-cotado',  color:'#198754', icon:'fa-clipboard-check', kpiColor:'green'},
-  'Pendente Pós Cirúrgicos':{cls:'b-pendente',color:'#ffc107', icon:'fa-hourglass-half', kpiColor:'amber'}
+  'Esteira de Faturamento'  :{cls:'b-cotado',  color:'#198754', icon:'fa-clipboard-check', kpiColor:'green'},
+  'Pós Cirúrgico em Tratativa':{cls:'b-pendente',color:'#ffc107', icon:'fa-hourglass-half', kpiColor:'amber'}
 };
 
 /* ================= ESTADO ================= */
@@ -524,12 +524,12 @@ function renderKPIs(){
   const rows=baseFiltrada(); // KPIs sempre refletem os filtros de topo (não o próprio clique)
   const total=rows.reduce((a,r)=>a+(r.valor||0),0);
   const grp=st=>rows.filter(r=>r.status===st);
-  const cotado=grp('Pós Cirúrgicos Cotado'), pend=grp('Pendente Pós Cirúrgicos'), crit=rows.filter(ehCritico);
+  const cotado=grp('Esteira de Faturamento'), pend=grp('Pós Cirúrgico em Tratativa'), crit=rows.filter(ehCritico);
   const val=a=>a.reduce((x,r)=>x+(r.valor||0),0);
   const cards=[
     {key:null, c:'blue', i:'fa-sack-dollar', l:'Faturamento Pendente', v:BRL(total), s:`${MN(rows.length)} lançamentos em aberto`},
-    {key:'Pós Cirúrgicos Cotado', c:'green', i:'fa-clipboard-check', l:'Pós Cirúrgicos Cotado', v:BRL(val(cotado)), s:`${MN(cotado.length)} títulos cotados`},
-    {key:'Pendente Pós Cirúrgicos', c:'amber', i:'fa-hourglass-half', l:'Pendente Pós Cirúrgicos', v:BRL(val(pend)), s:`${MN(pend.length)} títulos pendentes`},
+    {key:'Esteira de Faturamento', c:'green', i:'fa-clipboard-check', l:'Esteira de Faturamento', v:BRL(val(cotado)), s:`${MN(cotado.length)} títulos cotados`},
+    {key:'Pós Cirúrgico em Tratativa', c:'amber', i:'fa-hourglass-half', l:'Pós Cirúrgico em Tratativa', v:BRL(val(pend)), s:`${MN(pend.length)} títulos pendentes`},
     {key:'__CRIT__', c:'red', i:'fa-triangle-exclamation', l:'Modo Crítico (+90 dias)', v:BRL(val(crit)), s:`${MN(crit.length)} lançamentos +90 dias de atraso`},
   ];
   kpiRow.innerHTML=cards.map((k,idx)=>`
@@ -773,21 +773,14 @@ function aplicarFiltroVisual(){
 
 /* ================= FAIXA DE MINI-INDICADORES ================= */
 function renderMini(rows){
-  const base=baseFiltrada(); // universo (sem o próprio recorte) para as faixas de atraso clicáveis
   const total=rows.reduce((a,r)=>a+(r.valor||0),0);
   const qtd=rows.length;
   const ticket=qtd?total/qtd:0;
-  const dentro=base.filter(r=>r.atraso>=0 && r.atraso<=60);         // dentro do prazo (0–60 dias)
-  const valDentro=dentro.reduce((a,r)=>a+(r.valor||0),0);
-  const atencao=base.filter(r=>r.atraso>=61 && r.atraso<=90);       // prestes a virar crítico
-  const valAtencao=atencao.reduce((a,r)=>a+(r.valor||0),0);
   const clientes=new Set(rows.map(r=>r.cliente).filter(Boolean)).size;
   const planos=new Set(rows.map(r=>r.plano).filter(Boolean)).size;
   const atrasoMedio=qtd?Math.round(rows.reduce((a,r)=>a+r.atraso,0)/qtd):0;
   const cards=[
     {c:'blue', i:'fa-receipt', l:'Ticket Médio', v:BRL(ticket), s:`base de ${MN(qtd)} pendências`, key:null},
-    {c:'green',i:'fa-circle-check', l:'Dentro do Prazo', v:BRL(valDentro), s:`${MN(dentro.length)} títulos de 0–60 dias`, key:'dentro'},
-    {c:'amber',i:'fa-bell', l:'Em Atenção (61–90d)', v:BRL(valAtencao), s:`${MN(atencao.length)} prestes a vencer`, key:'atencao'},
     {c:'blue', i:'fa-users', l:'Clientes Distintos', v:MN(clientes), s:`${MN(planos)} planos de saúde`, key:null},
     {c:'red',  i:'fa-clock-rotate-left', l:'Atraso Médio', v:`${MN(atrasoMedio)} dias`, s:'média da carteira', key:null},
   ];
@@ -804,13 +797,6 @@ function renderMini(rows){
         </div>
       </div>
     </div>`).join('');
-  // liga cliques nas faixas de atraso (Dentro do Prazo / Em Atenção)
-  miniRow.querySelectorAll('.mini-click').forEach(el=>el.addEventListener('click',()=>{
-    const key=el.dataset.mini;
-    activeAging=(activeAging===key)?null:key; // alterna
-    activeKPI=null; verTudo=false; fStatus.value='';
-    aplicarFiltroVisual();
-  }));
 }
 
 /* ================= MINI-PAINÉIS (Top5 + Aging) ================= */
